@@ -141,7 +141,7 @@ export default function LoginScreen({
           </Button>
 
           <p className="text-sm text-center mt-4">
-            No account yet? <span className="text-blue-600 font-semibold cursor-pointer hover:underline">Sign up</span>
+            No account yet? <span onClick={() => window.location.href = "#signup"} className="text-blue-600 font-semibold cursor-pointer hover:underline">Sign up</span>
           </p>
         </form>
       </div>

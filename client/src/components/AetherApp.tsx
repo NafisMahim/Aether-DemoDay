@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast"
 
 // Components
 import LoginScreen from "./screens/LoginScreen"
+import SignupScreen from "./screens/SignupScreen"
 import HomeScreen from "./screens/HomeScreen"
 import QuizScreen from "./screens/QuizScreen"
 import InterestsScreen from "./screens/InterestsScreen"
@@ -25,6 +26,7 @@ export default function AetherApp() {
   const { toast } = useToast()
   const [currentScreen, setCurrentScreen] = useState<
     | "login"
+    | "signup"
     | "home"
     | "quiz"
     | "interests"
@@ -114,6 +116,41 @@ export default function AetherApp() {
     }
   })
 
+  // Signup mutation
+  const signupMutation = useMutation({
+    mutationFn: async (userData: { username: string; email: string; password: string }) => {
+      const response = await apiRequest("POST", "/api/register", userData)
+      return response.json()
+    },
+    onSuccess: (data) => {
+      if (data.user) {
+        setUser(data.user)
+        setCurrentScreen("home")
+        setErrorMessage("")
+        setUserData({
+          ...userData,
+          name: data.user.displayName || data.user.username
+        })
+        toast({
+          title: "Account created",
+          description: `Welcome to Aether, ${data.user.displayName || data.user.username}!`,
+        })
+      }
+    },
+    onError: (error: any) => {
+      let errorMsg = "Registration failed. Please try again."
+      if (error.message && typeof error.message === 'string') {
+        errorMsg = error.message
+      }
+      setErrorMessage(errorMsg)
+      toast({
+        title: "Registration failed",
+        description: errorMsg,
+        variant: "destructive",
+      })
+    }
+  })
+
   // Handle login
   const handleLogin = () => {
     if (username && password) {
@@ -121,6 +158,21 @@ export default function AetherApp() {
     } else {
       setErrorMessage("Please enter your username and password.")
     }
+  }
+
+  // Handle signup
+  const handleSignup = (username: string, email: string, password: string) => {
+    if (username && email && password) {
+      signupMutation.mutate({ username, email, password })
+    } else {
+      setErrorMessage("Please fill out all required fields.")
+    }
+  }
+
+  // Switch between login and signup screens
+  const toggleAuthScreen = () => {
+    setErrorMessage("")
+    setCurrentScreen(currentScreen === "login" ? "signup" : "login")
   }
 
   // Handle navigation
@@ -186,6 +238,14 @@ export default function AetherApp() {
     }
   }
 
+  // Check if we should show the signup screen from hash routing
+  useEffect(() => {
+    if (window.location.hash === '#signup') {
+      setCurrentScreen('signup')
+      window.location.hash = ''
+    }
+  }, [])
+  
   return (
     <div className="flex justify-center items-center min-h-screen bg-gradient-to-b from-[#e3f2fd] to-[#bbdefb]">
       <div className="w-[360px] h-[740px] bg-black rounded-[40px] border-[8px] border-black shadow-xl relative overflow-hidden">
@@ -204,6 +264,13 @@ export default function AetherApp() {
               handleSocialLogin={handleSocialLogin}
               errorMessage={errorMessage}
               isLoading={loginMutation.isPending}
+            />
+          ) : currentScreen === "signup" ? (
+            <SignupScreen
+              onBackToLogin={toggleAuthScreen}
+              onSignupSubmit={handleSignup}
+              errorMessage={errorMessage}
+              isLoading={signupMutation.isPending}
             />
           ) : currentScreen === "home" ? (
             <HomeScreen username={userData.name} navigateTo={navigateTo} quizResults={quizResults} />
