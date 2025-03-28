@@ -1,10 +1,37 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import session from "express-session";
+import passport from "passport";
+import memorystore from "memorystore";
+import { configurePassport } from './auth';
+
+const MemoryStore = memorystore(session);
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Set up session management
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'aether-app-secret',
+  resave: false,
+  saveUninitialized: false,
+  store: new MemoryStore({
+    checkPeriod: 86400000 // prune expired entries every 24h
+  }),
+  cookie: {
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    secure: process.env.NODE_ENV === 'production'
+  }
+}));
+
+// Set up passport authentication
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Configure passport strategies
+configurePassport();
 
 app.use((req, res, next) => {
   const start = Date.now();

@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, jsonb, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -6,10 +6,18 @@ import { z } from "zod";
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  password: text("password"),
+  email: text("email").unique(),
+  displayName: text("display_name"),
   bio: text("bio").default("Exploring new opportunities and personal growth!"),
   personalityType: text("personality_type"),
   quizResults: jsonb("quiz_results"),
+  createdAt: timestamp("created_at").defaultNow(),
+  lastLogin: timestamp("last_login"),
+  profileImage: text("profile_image"),
+  avatar: text("avatar"),
+  googleId: text("google_id").unique(),
+  githubId: text("github_id").unique(),
 });
 
 // Interests Table
@@ -93,6 +101,12 @@ export const userSubscriptions = pgTable("user_subscriptions", {
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
+  email: true,
+  displayName: true,
+  profileImage: true,
+  avatar: true,
+  googleId: true,
+  githubId: true,
 });
 
 // Types

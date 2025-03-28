@@ -53,6 +53,36 @@ export default function AetherApp() {
     ]
   })
 
+  // Auth status query
+  const [user, setUser] = useState<any>(null)
+  const [isAuthenticating, setIsAuthenticating] = useState(true)
+
+  // Check authentication status on load
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      try {
+        const response = await fetch('/api/auth/status')
+        const data = await response.json()
+        
+        if (data.isAuthenticated && data.user) {
+          setUser(data.user)
+          setUserData({
+            name: data.user.displayName || data.user.username,
+            bio: data.user.bio || "Exploring new opportunities and personal growth!",
+            interests: userData.interests // Keep default interests for now
+          })
+          setCurrentScreen("home")
+        }
+      } catch (error) {
+        console.error('Error checking auth status:', error)
+      } finally {
+        setIsAuthenticating(false)
+      }
+    }
+    
+    checkAuthStatus()
+  }, [])
+
   // Login mutation
   const loginMutation = useMutation({
     mutationFn: async (credentials: { username: string; password: string }) => {
@@ -60,13 +90,19 @@ export default function AetherApp() {
       return response.json()
     },
     onSuccess: (data) => {
-      setCurrentScreen("home")
-      setErrorMessage("")
-      setUserData({...userData, name: username})
-      toast({
-        title: "Login successful",
-        description: `Welcome back, ${username}!`,
-      })
+      if (data.user) {
+        setUser(data.user)
+        setCurrentScreen("home")
+        setErrorMessage("")
+        setUserData({
+          ...userData, 
+          name: data.user.displayName || data.user.username
+        })
+        toast({
+          title: "Login successful",
+          description: `Welcome back, ${data.user.displayName || data.user.username}!`,
+        })
+      }
     },
     onError: (error) => {
       setErrorMessage("Invalid username or password. Please try again.")
@@ -100,13 +136,45 @@ export default function AetherApp() {
   const handleSocialLogin = (provider: string) => {
     toast({
       title: `${provider} login`,
-      description: `Logging in with ${provider}...`,
+      description: `Redirecting to ${provider} login...`,
     })
-    // In a real app, this would handle OAuth
-    setTimeout(() => {
-      setCurrentScreen("home")
-      setUserData({...userData, name: "Richard Wang"})
-    }, 1000)
+    
+    // Redirect to the proper OAuth endpoint
+    switch (provider) {
+      case "Google":
+        window.location.href = "/auth/google"
+        break
+      case "GitHub":
+        window.location.href = "/auth/github"
+        break
+      default:
+        toast({
+          title: "Not implemented",
+          description: `Login with ${provider} is not yet available.`,
+          variant: "destructive"
+        })
+    }
+  }
+
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      const response = await apiRequest("POST", "/api/logout")
+      const data = await response.json()
+      
+      setUser(null)
+      setCurrentScreen("login")
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out.",
+      })
+    } catch (error) {
+      toast({
+        title: "Logout failed",
+        description: "There was an error logging out. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   // Handle back navigation
