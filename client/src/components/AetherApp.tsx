@@ -311,7 +311,8 @@ export default function AetherApp() {
                   ...newData,
                   profileImage: userData.profileImage // Preserve the profile image
                 })
-              }} 
+              }}
+              navigateTo={navigateTo}
             />
           ) : currentScreen === "experience" ? (
             <ExperienceScreen handleBack={handleBack} />
