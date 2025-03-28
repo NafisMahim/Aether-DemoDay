@@ -60,7 +60,7 @@ export default function HomeScreen({ username, navigateTo, quizResults }: HomeSc
             {firstLetter}
           </div>
           <h2 className="text-lg font-bold">{username}</h2>
-          <p className="text-xs text-gray-500 italic mt-1">"Exploring new opportunities and personal growth!"</p>
+          <p className="text-xs text-gray-500 italic mt-1">"{quizResults?.bio || "Exploring new opportunities and personal growth!"}"</p>
         </div>
       </section>
 

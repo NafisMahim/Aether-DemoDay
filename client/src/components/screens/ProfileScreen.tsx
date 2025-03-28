@@ -61,6 +61,13 @@ export default function ProfileScreen({ handleBack, username, quizResults, bio, 
 
   const handleSaveBio = () => {
     setIsEditing(false)
+    
+    // In a real app, we would update this on the server via an API call
+    if (quizResults) {
+      // Update the quiz results directly to include the bio
+      quizResults.bio = editedBio
+    }
+    
     toast({
       title: "Profile updated",
       description: "Your bio has been updated successfully."

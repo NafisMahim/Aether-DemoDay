@@ -330,6 +330,17 @@ export default function AetherApp() {
                   name: updatedData.name,
                   bio: updatedData.bio,
                 })
+                
+                // Update quiz results to include bio so it shows on home screen
+                if (quizResults) {
+                  setQuizResults({
+                    ...quizResults,
+                    bio: updatedData.bio
+                  })
+                } else {
+                  setQuizResults({ bio: updatedData.bio })
+                }
+                
                 toast({
                   title: "Profile updated",
                   description: "Your profile has been updated successfully."
