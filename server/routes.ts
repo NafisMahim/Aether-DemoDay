@@ -712,18 +712,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         Recommended careers that combine these dimensions include:
         ${hybridCareers.join(', ')}
         
-        I need you to provide a career analysis that consists of EXACTLY 2 PARAGRAPHS (no more, no less).
+        I need you to provide a VERY BRIEF career analysis with EXACTLY 2 SHORT PARAGRAPHS (no more, no less).
 
-        Your response should start with "Paragraph 1:" and end with the last sentence of paragraph 2.
+        Paragraph 1: In 2-3 VERY SHORT sentences, explain what this combination means for my career path.
         
-        Paragraph 1 MUST explain what this combination of career dimensions means for my professional path and how I can leverage these strengths in today's job market.
+        Paragraph 2: In 2-3 VERY SHORT sentences, suggest specific steps to develop these skills further.
         
-        Paragraph 2 MUST suggest specific steps I can take to develop these career dimensions further, including potential education paths or skill development opportunities.
+        KEEP IT EXTREMELY CONCISE. Each paragraph should be 30-40 words maximum.
+        Use simple, direct language. Avoid complex sentences or lengthy explanations.
         
-        Each paragraph should be concise (3-4 sentences each) and informative. Use a professional but encouraging tone.
-        
-        DO NOT add extra spacing between paragraphs. DO NOT add an introduction or conclusion.
-        DO NOT number the paragraphs or make bullet points. Write continuous prose in exactly 2 paragraphs.
+        DO NOT add labels, introductions, or conclusions. Just write the 2 short paragraphs.
       `;
       
       // Configure generation parameters
