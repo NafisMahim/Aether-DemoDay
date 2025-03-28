@@ -56,11 +56,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // API routes
   
   // Local login route
-  app.post('/api/login', passport.authenticate('local'), (req, res) => {
-    res.status(200).json({
-      user: getSafeUserData(req.user),
-      message: 'Login successful'
-    });
+  app.post('/api/login', (req, res, next) => {
+    console.log('Login attempt:', req.body.username);
+    
+    passport.authenticate('local', (err, user, info) => {
+      if (err) {
+        console.error('Login error:', err);
+        return next(err);
+      }
+      
+      if (!user) {
+        console.log('Authentication failed:', info?.message || 'Unknown reason');
+        return res.status(401).json({ message: info?.message || 'Invalid username or password' });
+      }
+      
+      req.login(user, (loginErr) => {
+        if (loginErr) {
+          console.error('req.login error:', loginErr);
+          return next(loginErr);
+        }
+        
+        console.log('Login successful for user:', user.id);
+        return res.status(200).json({
+          user: getSafeUserData(user),
+          message: 'Login successful'
+        });
+      });
+    })(req, res, next);
   });
 
   // Logout route

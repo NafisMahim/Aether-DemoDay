@@ -28,26 +28,37 @@ export function configurePassport() {
     passwordField: 'password'
   }, async (username, password, done) => {
     try {
+      console.log(`Attempting login for username: ${username}`);
+      
       // Find the user by username or email
       const user = await storage.getUserByUsername(username) || 
                    await storage.getUserByEmail(username);
       
       if (!user) {
+        console.log('User not found');
         return done(null, false, { message: 'Invalid username or password' });
       }
       
+      console.log(`User found with ID: ${user.id}`);
+      
       // Verify password if the user has one (they might have registered with OAuth)
       if (user.password) {
-        const passwordMatch = await compare(password, user.password);
+        console.log('Comparing password...');
+        const passwordMatch = await verifyPassword(password, user.password);
         if (!passwordMatch) {
+          console.log('Password does not match');
           return done(null, false, { message: 'Invalid username or password' });
         }
+        console.log('Password matches!');
       } else {
+        console.log('User has no password (likely OAuth account)');
         return done(null, false, { message: 'Please log in with the social provider you used to register' });
       }
       
+      console.log('Authentication successful!');
       return done(null, user);
     } catch (error) {
+      console.error('Login error:', error);
       return done(error);
     }
   }));
@@ -146,4 +157,17 @@ export function configurePassport() {
 export async function hashPassword(password: string): Promise<string> {
   const saltRounds = 10;
   return hash(password, saltRounds);
+}
+
+// Function to verify and debug password comparison
+export async function verifyPassword(plainPassword: string, hashedPassword: string): Promise<boolean> {
+  try {
+    console.log(`Verifying password, hashed length: ${hashedPassword.length}`);
+    const isMatch = await compare(plainPassword, hashedPassword);
+    console.log(`Password verification result: ${isMatch}`);
+    return isMatch;
+  } catch (error) {
+    console.error('Error verifying password:', error);
+    return false;
+  }
 }
