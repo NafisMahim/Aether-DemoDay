@@ -387,28 +387,74 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
     const results = generateCareerData()
     
     try {
-      // Save quiz results to user profile
-      const response = await apiRequest("POST", "/api/user/quiz-results", {
+      console.log("Saving quiz results:", {
         results,
         analysis: analysisResult,
         summary: careerSummary,
         date: new Date().toISOString()
       })
       
-      if (response.ok) {
+      // Check authentication status first
+      const authStatusResponse = await fetch('/api/auth/status')
+      const authData = await authStatusResponse.json()
+      
+      if (!authData.isAuthenticated) {
         toast({
-          title: "Success!",
-          description: "Your assessment results have been saved to your profile.",
+          title: "Authentication Required",
+          description: "Please log in first to save results to your profile.",
+          variant: "destructive",
         })
-      } else {
+        // Still return results to the home screen
+        handleBack(results)
+        return
+      }
+      
+      try {
+        // Save quiz results to user profile
+        const response = await fetch('/api/user/quiz-results', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            results,
+            analysis: analysisResult,
+            summary: careerSummary,
+            date: new Date().toISOString()
+          }),
+          credentials: 'include'
+        })
+        
+        console.log("API response status:", response.status)
+        
+        if (response.ok) {
+          const responseData = await response.json()
+          console.log("Save response:", responseData)
+          
+          toast({
+            title: "Success!",
+            description: "Your assessment results have been saved to your profile.",
+          })
+        } else {
+          const errorData = await response.text()
+          console.error("Error response:", errorData)
+          
+          toast({
+            title: "Error",
+            description: "Failed to save results to your profile. Please try again.",
+            variant: "destructive",
+          })
+        }
+      } catch (apiError) {
+        console.error("API call error:", apiError)
         toast({
-          title: "Error",
-          description: "Failed to save results to your profile. Please try again.",
+          title: "Connection Error",
+          description: "Could not connect to the server. Please try again later.",
           variant: "destructive",
         })
       }
     } catch (error) {
-      console.error("Error saving quiz results:", error)
+      console.error("Error in handleViewDetails:", error)
       toast({
         title: "Error",
         description: "Something went wrong. Please try again later.",

@@ -536,7 +536,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Format the prompt with the career data
       const prompt = `
-        Based on the following career assessment results, provide two detailed paragraphs of personalized career insights:
+        IMPORTANT: Your entire response must be ONLY two paragraphs in total. Do not include any introduction, context, or additional commentary. Just provide exactly two paragraphs.
+        
+        Based on the following career assessment results, write exactly two paragraphs (and nothing else) of personalized career insights:
         
         Primary Career Dimension: ${careerData.primaryType.name} (${careerData.primaryType.score}%)
         Description: ${careerData.primaryType.description}
@@ -557,9 +559,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         Recommended Hybrid Careers (combining primary and secondary):
         ${careerData.hybridCareers.join(', ')}
         
-        First paragraph: Focus on how these specific career dimensions reflect the person's strengths and natural aptitudes, and how they might manifest in different professional contexts. Be specific and detailed.
+        Paragraph 1: Focus on how these career dimensions reflect the person's strengths and natural aptitudes, and how they might manifest professionally.
         
-        Second paragraph: Provide forward-looking advice about how to leverage these strengths, potential development areas, and unexplored career paths that might be especially fulfilling given this particular combination of traits. Make it personalized and actionable.
+        Paragraph 2: Provide forward-looking advice about leveraging these strengths, potential development areas, and unexplored career paths that match this combination of traits.
+        
+        Remember, provide EXACTLY two paragraphs and nothing else - no introductions, no explanations, no "here are two paragraphs" text.
       `;
       
       // Configure generation parameters
@@ -637,18 +641,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Save quiz results to user profile
   app.post('/api/user/quiz-results', ensureAuthenticated, async (req, res) => {
     try {
+      console.log('Saving quiz results for user:', req.user!.id);
       const userId = req.user!.id;
       const { results, analysis, summary, date } = req.body;
       
+      console.log('Quiz results data structure:', JSON.stringify(results, null, 2));
+      
+      // Ensure we have a valid structure to prevent errors
+      const safeResults = results || {};
+      
       // Update the user with quiz results
       const updatedUser = await storage.updateUser(userId, {
-        quizResults: results,
-        personalityType: results.primaryType?.name || null
+        quizResults: safeResults,
+        personalityType: safeResults.primaryType?.name || null
       });
       
       if (!updatedUser) {
+        console.error('User not found when saving quiz results for ID:', userId);
         return res.status(404).json({ message: "User not found" });
       }
+      
+      console.log('Quiz results saved successfully for user:', userId);
       
       res.status(200).json({ 
         message: "Quiz results saved successfully",
@@ -656,7 +669,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error('Error saving quiz results:', error);
-      res.status(500).json({ error: 'Failed to save quiz results' });
+      res.status(500).json({ 
+        message: 'Failed to save quiz results',
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   });
   
