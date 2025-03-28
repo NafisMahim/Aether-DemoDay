@@ -23,6 +23,7 @@ import ComingSoonScreen from "./screens/ComingSoonScreen"
 import EditProfileScreen from "./screens/EditProfileScreen"
 import PrivacySecurityScreen from "./screens/PrivacySecurityScreen"
 import NotificationSettingsScreen from "./screens/NotificationSettingsScreen"
+import InternshipsScreen from "./screens/InternshipsScreen"
 
 // Main App Component
 export default function AetherApp() {
@@ -44,6 +45,7 @@ export default function AetherApp() {
     | "editProfile"
     | "privacySecurity"
     | "notificationSettings"
+    | "internships"
   >("login")
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
@@ -452,6 +454,12 @@ export default function AetherApp() {
             <PrivacySecurityScreen handleBack={() => navigateTo("profile")} />
           ) : currentScreen === "notificationSettings" ? (
             <NotificationSettingsScreen handleBack={() => navigateTo("profile")} />
+          ) : currentScreen === "internships" ? (
+            <InternshipsScreen 
+              handleBack={handleBack} 
+              quizResults={quizResults}
+              interests={userData.interests}
+            />
           ) : (
             <ComingSoonScreen screen={currentScreen} handleBack={handleBack} />
           )}

@@ -6,7 +6,8 @@ import passport from "passport";
 import session from "express-session";
 import { configurePassport, hashPassword } from "./auth";
 import MemoryStore from "memorystore";
-import { GoogleGenerativeAI, type types } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { findInternships } from "./internshipService";
 
 // Initialize Gemini AI
 const geminiApiKey = process.env.GEMINI_API_KEY;
@@ -75,6 +76,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // API routes
+  
+  // Find internships based on career profile and interests
+  // Not requiring authentication to allow preview of feature
+  app.post('/api/internships/search', async (req, res) => {
+    try {
+      const { jobTitles, keywords } = req.body;
+      
+      if (!jobTitles && !keywords) {
+        return res.status(400).json({ 
+          success: false,
+          message: 'At least one search parameter (jobTitles or keywords) is required'
+        });
+      }
+      
+      // Log search parameters for debugging
+      console.log('Internship search parameters:', { jobTitles, keywords });
+      
+      // Search for internships using the provided terms
+      const results = await findInternships(
+        jobTitles || [], 
+        keywords || []
+      );
+      
+      // Check if we got any results
+      let totalJobs = 0;
+      if (results.remotive) {
+        totalJobs = results.remotive.reduce((sum, category) => sum + (category.jobs?.length || 0), 0);
+      }
+      
+      console.log(`Found ${totalJobs} total internships across ${results.remotive?.length || 0} categories`);
+      
+      return res.status(200).json({
+        success: true,
+        results: results,
+        message: totalJobs > 0 
+          ? `Found ${totalJobs} internship opportunities` 
+          : 'No internships found for your search criteria'
+      });
+    } catch (error) {
+      console.error('Internship search error:', error);
+      return res.status(500).json({ 
+        success: false,
+        message: 'Failed to search for internships',
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
   
   // Local login route
   app.post('/api/login', (req, res, next) => {
