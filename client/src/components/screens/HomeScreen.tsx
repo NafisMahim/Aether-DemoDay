@@ -27,7 +27,7 @@ export default function HomeScreen({ username, navigateTo, quizResults }: HomeSc
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <header className="flex items-center justify-between px-5 pt-8 pb-4">
+      <header className="flex items-center justify-between px-5 mobile-header">
         <div className="flex items-center">
           <div className="relative w-[40px] h-[40px]">
             <img src="/assets/aether-logo.svg" alt="Aether Logo" className="w-full h-full object-contain" />

@@ -50,8 +50,8 @@ export default function FinancialsScreen({ handleBack }: FinancialsScreenProps) 
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <header className="bg-white shadow-sm px-5 py-4 flex items-center">
-        <button className="mr-3" onClick={handleBack}>
+      <header className="bg-white shadow-sm px-5 mobile-header flex items-center">
+        <button className="back-button p-2 rounded-full hover:bg-gray-100 transition-colors" onClick={handleBack}>
           <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
           </svg>

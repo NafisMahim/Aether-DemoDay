@@ -4,17 +4,28 @@
 
 /* Global styles for screen headers and proper spacing */
 header {
-  padding-top: 1.25rem !important; /* Ensure consistent padding at the top of all screens */
+  padding-top: 2.5rem !important; /* Increased padding to account for dynamic island */
+  padding-bottom: 1rem !important; /* Ensure consistent padding at the bottom of headers */
 }
 
 /* Ensure content doesn't get too close to the top */
 .screen-content {
-  padding-top: 0.75rem;
+  padding-top: 1rem;
 }
 
 /* Add additional padding for screens with dynamic island */
 .dynamic-island-padding {
-  padding-top: 2rem !important;
+  padding-top: 3rem !important; /* Increased padding for screens that need extra space */
+}
+
+/* Mobile header specific styles */
+.mobile-header {
+  margin-top: 1.25rem; /* Add space above header content */
+}
+
+/* Back button specific styles */
+.back-button {
+  margin-right: 1rem; /* Add more space between back button and title */
 }
 
 @layer base {
