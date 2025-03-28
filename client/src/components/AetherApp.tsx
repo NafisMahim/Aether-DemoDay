@@ -366,32 +366,86 @@ export default function AetherApp() {
                 profileImage: userData.profileImage
               }} 
               onSave={async (updatedData) => {
-                // In a real app, we would save the data to the server
-                setUserData({
-                  ...userData,
-                  name: updatedData.name,
-                  bio: updatedData.bio,
-                  profileImage: updatedData.profileImage || userData.profileImage
-                })
-                
-                // Update quiz results to include bio so it shows on home screen
-                if (quizResults) {
-                  setQuizResults({
-                    ...quizResults,
+                // Save the data to the server
+                if (user && user.id) {
+                  try {
+                    const response = await apiRequest("PATCH", `/api/users/${user.id}`, {
+                      displayName: updatedData.name,
+                      username: updatedData.username,
+                      email: updatedData.email,
+                      bio: updatedData.bio,
+                      profileImage: updatedData.profileImage
+                    })
+                    
+                    const data = await response.json()
+                    
+                    // Update local user state with server response
+                    if (data.user) {
+                      setUser(data.user)
+                    }
+                    
+                    // Update client state
+                    setUserData({
+                      ...userData,
+                      name: updatedData.name,
+                      bio: updatedData.bio,
+                      profileImage: updatedData.profileImage || userData.profileImage
+                    })
+                    
+                    // Update quiz results to include bio so it shows on home screen
+                    if (quizResults) {
+                      setQuizResults({
+                        ...quizResults,
+                        bio: updatedData.bio,
+                        profileImage: updatedData.profileImage || userData.profileImage
+                      })
+                    } else {
+                      setQuizResults({ 
+                        bio: updatedData.bio,
+                        profileImage: updatedData.profileImage || userData.profileImage
+                      })
+                    }
+                    
+                    toast({
+                      title: "Profile updated",
+                      description: "Your profile has been updated successfully."
+                    })
+                  } catch (error) {
+                    console.error("Error updating profile:", error)
+                    toast({
+                      title: "Update failed",
+                      description: "There was an error updating your profile. Please try again.",
+                      variant: "destructive"
+                    })
+                    throw error // Re-throw to be caught by EditProfileScreen's error handler
+                  }
+                } else {
+                  // Fallback to client-side only updates if not logged in
+                  setUserData({
+                    ...userData,
+                    name: updatedData.name,
                     bio: updatedData.bio,
                     profileImage: updatedData.profileImage || userData.profileImage
                   })
-                } else {
-                  setQuizResults({ 
-                    bio: updatedData.bio,
-                    profileImage: updatedData.profileImage || userData.profileImage
+                  
+                  if (quizResults) {
+                    setQuizResults({
+                      ...quizResults,
+                      bio: updatedData.bio,
+                      profileImage: updatedData.profileImage || userData.profileImage
+                    })
+                  } else {
+                    setQuizResults({ 
+                      bio: updatedData.bio,
+                      profileImage: updatedData.profileImage || userData.profileImage
+                    })
+                  }
+                  
+                  toast({
+                    title: "Profile updated",
+                    description: "Your profile has been updated successfully."
                   })
                 }
-                
-                toast({
-                  title: "Profile updated",
-                  description: "Your profile has been updated successfully."
-                })
               }}
             />
           ) : currentScreen === "privacySecurity" ? (

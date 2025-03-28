@@ -59,10 +59,10 @@ export default function EditProfileScreen({
     const reader = new FileReader()
     reader.onload = (event) => {
       if (event.target?.result) {
-        setProfileImagePreview(event.target.result as string)
-        // In a real app, we would handle the file upload to a server here
-        // For now, we'll just set a placeholder to indicate it's changed
-        setFormData(prev => ({ ...prev, profileImage: "new-image-uploaded" }))
+        const imageData = event.target.result as string
+        setProfileImagePreview(imageData)
+        // Store the actual base64 image data
+        setFormData(prev => ({ ...prev, profileImage: imageData }))
       }
     }
     reader.readAsDataURL(file)
