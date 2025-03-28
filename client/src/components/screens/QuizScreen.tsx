@@ -33,6 +33,8 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
   const [aiAnalysis, setAiAnalysis] = useState<string>("")
   const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
+  const [analysisResult, setAnalysisResult] = useState<string>("")
+  const [careerSummary, setCareerSummary] = useState<string>("")
   
   const questions: QuizQuestion[] = [
     {
@@ -171,10 +173,12 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
       // First get detailed analysis
       const analysisResponse = await apiRequest('POST', '/api/career-analysis', { careerData })
       const analysisData = await analysisResponse.json()
+      setAnalysisResult(analysisData.analysis)
       
       // Then get summary 
       const summaryResponse = await apiRequest('POST', '/api/career-summary', { careerData })
       const summaryData = await summaryResponse.json()
+      setCareerSummary(summaryData.analysis)
       
       // Combine both analyses
       const fullAnalysis = analysisData.analysis + "\n\n" + summaryData.analysis
@@ -379,8 +383,39 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
     return combinations[key1] || combinations[key2] || []
   }
 
-  const handleViewDetails = () => {
+  const handleViewDetails = async () => {
     const results = generateCareerData()
+    
+    try {
+      // Save quiz results to user profile
+      const response = await apiRequest("POST", "/api/user/quiz-results", {
+        results,
+        analysis: analysisResult,
+        summary: careerSummary,
+        date: new Date().toISOString()
+      })
+      
+      if (response.ok) {
+        toast({
+          title: "Success!",
+          description: "Your assessment results have been saved to your profile.",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to save results to your profile. Please try again.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error saving quiz results:", error)
+      toast({
+        title: "Error",
+        description: "Something went wrong. Please try again later.",
+        variant: "destructive",
+      })
+    }
+    
     handleBack(results)
   }
 
@@ -546,7 +581,7 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
                 onClick={handleViewDetails}
                 className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-3 rounded-lg mb-3"
               >
-                View Full Analysis
+                Save to Profile
               </Button>
               <Button
                 variant="outline"

@@ -565,7 +565,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Configure generation parameters
       const generationConfig = {
         temperature: 1.0,
-        maxOutputTokens: 2000,
+        maxOutputTokens: 1000, // Reduced token count
       };
       
       // Generate content
@@ -634,6 +634,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ---------- AI CAREER ANALYSIS ----------
   
+  // Save quiz results to user profile
+  app.post('/api/user/quiz-results', ensureAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const { results, analysis, summary, date } = req.body;
+      
+      // Update the user with quiz results
+      const updatedUser = await storage.updateUser(userId, {
+        quizResults: results,
+        personalityType: results.primaryType?.name || null
+      });
+      
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.status(200).json({ 
+        message: "Quiz results saved successfully",
+        user: getSafeUserData(updatedUser)
+      });
+    } catch (error) {
+      console.error('Error saving quiz results:', error);
+      res.status(500).json({ error: 'Failed to save quiz results' });
+    }
+  });
+  
   // Generate career analysis using Gemini AI
   app.post('/api/career-analysis', async (req, res) => {
     try {
@@ -670,19 +696,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         Recommended careers that combine these dimensions include:
         ${hybridCareers.join(', ')}
         
-        Please provide a detailed career analysis (around 3-4 paragraphs) that:
-        1. Explains what this combination of career dimensions means for my professional path
-        2. Discusses how I can leverage these strengths in today's job market
-        3. Suggests specific steps I can take to develop these career dimensions further
-        4. Recommends education paths, certifications, or skill development opportunities
+        Please provide a detailed career analysis in EXACTLY 2 paragraphs (no more, no less) that:
         
-        Write in a professional but encouraging tone and format the response with proper paragraphs for readability.
+        Paragraph 1: Explain what this combination of career dimensions means for my professional path and how I can leverage these strengths in today's job market.
+        
+        Paragraph 2: Suggest specific steps I can take to develop these career dimensions further, including potential education paths or skill development opportunities.
+        
+        Write in a professional but encouraging tone. Each paragraph should be concise but informative.
       `;
       
       // Configure generation parameters
       const generationConfig = {
         temperature: 1.0,
-        maxOutputTokens: 2000,
+        maxOutputTokens: 1000, // Reduced token count
       };
       
       // Generate content
