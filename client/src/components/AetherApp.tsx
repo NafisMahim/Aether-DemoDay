@@ -20,6 +20,9 @@ import NotificationsScreen from "./screens/NotificationsScreen"
 import MessagesScreen from "./screens/MessagesScreen"
 import PremiumScreen from "./screens/PremiumScreen"
 import ComingSoonScreen from "./screens/ComingSoonScreen"
+import EditProfileScreen from "./screens/EditProfileScreen"
+import PrivacySecurityScreen from "./screens/PrivacySecurityScreen"
+import NotificationSettingsScreen from "./screens/NotificationSettingsScreen"
 
 // Main App Component
 export default function AetherApp() {
@@ -38,6 +41,9 @@ export default function AetherApp() {
     | "notifications"
     | "messages"
     | "premium"
+    | "editProfile"
+    | "privacySecurity"
+    | "notificationSettings"
   >("login")
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
@@ -292,7 +298,14 @@ export default function AetherApp() {
           ) : currentScreen === "locations" ? (
             <LocationsScreen handleBack={handleBack} />
           ) : currentScreen === "profile" ? (
-            <ProfileScreen handleBack={handleBack} username={userData.name} quizResults={quizResults} bio={userData.bio} onLogout={handleLogout} />
+            <ProfileScreen 
+              handleBack={handleBack} 
+              username={userData.name} 
+              quizResults={quizResults} 
+              bio={userData.bio} 
+              onLogout={handleLogout}
+              navigateTo={navigateTo}
+            />
           ) : currentScreen === "notifications" ? (
             <NotificationsScreen handleBack={handleBack} />
           ) : currentScreen === "messages" ? (
@@ -301,6 +314,32 @@ export default function AetherApp() {
             <SearchScreen handleBack={handleBack} />
           ) : currentScreen === "premium" ? (
             <PremiumScreen handleBack={handleBack} />
+          ) : currentScreen === "editProfile" ? (
+            <EditProfileScreen 
+              handleBack={() => navigateTo("profile")} 
+              userData={{
+                name: userData.name,
+                username: user?.username || "",
+                email: user?.email || "",
+                bio: userData.bio,
+              }} 
+              onSave={async (updatedData) => {
+                // In a real app, we would save the data to the server
+                setUserData({
+                  ...userData,
+                  name: updatedData.name,
+                  bio: updatedData.bio,
+                })
+                toast({
+                  title: "Profile updated",
+                  description: "Your profile has been updated successfully."
+                })
+              }}
+            />
+          ) : currentScreen === "privacySecurity" ? (
+            <PrivacySecurityScreen handleBack={() => navigateTo("profile")} />
+          ) : currentScreen === "notificationSettings" ? (
+            <NotificationSettingsScreen handleBack={() => navigateTo("profile")} />
           ) : (
             <ComingSoonScreen screen={currentScreen} handleBack={handleBack} />
           )}
