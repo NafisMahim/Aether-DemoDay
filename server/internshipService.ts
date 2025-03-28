@@ -1,5 +1,105 @@
 import axios from 'axios';
 
+/**
+ * Fetch internships from RapidAPI Internships API
+ * @param searchTerms Array of search terms to query for
+ * @returns Promise resolving to array of internship results
+ */
+export async function searchRapidAPIInternships(
+  searchTerms: string[]
+): Promise<InternshipSearchResult[]> {
+  try {
+    // RapidAPI endpoint and headers
+    const url = "https://internships-api.p.rapidapi.com/active-jb-7d";
+    const options = {
+      headers: {
+        "x-rapidapi-host": "internships-api.p.rapidapi.com",
+        "x-rapidapi-key": "3f9c2ecba6mshd1f47ab59b16e42p1e8991jsn055e3aba0a5a"
+      }
+    };
+
+    console.log(`Fetching internships from RapidAPI Internships API...`);
+    
+    try {
+      // Make API request
+      const response = await axios.get(url, options);
+      
+      if (response.status !== 200 || !response.data) {
+        console.error("RapidAPI error: Invalid response", response.status);
+        throw new Error(`RapidAPI returned status ${response.status}`);
+      }
+      
+      console.log(`RapidAPI response status: ${response.status}, found ${Array.isArray(response.data) ? response.data.length : 0} internships`);
+      
+      // Transform the RapidAPI response to match our InternshipSearchResult format
+      const allInternships = response.data;
+      const results: InternshipSearchResult[] = [];
+      
+      if (!Array.isArray(allInternships)) {
+        console.error("RapidAPI error: Response is not an array", typeof allInternships);
+        throw new Error("RapidAPI response is not an array");
+      }
+      
+      // Log sample data
+      if (allInternships.length > 0) {
+        console.log("RapidAPI sample data:", JSON.stringify(allInternships[0]).substring(0, 300) + "...");
+      }
+      
+      // Group internships by search term categories
+      for (const term of searchTerms) {
+        const termLower = term.toLowerCase();
+        
+        // Filter internships relevant to this search term
+        const relevantJobs = allInternships.filter((internship: any) => {
+          const title = ((internship.title || '') + '').toLowerCase();
+          const company = ((internship.company || '') + '').toLowerCase();
+          const description = ((internship.description || '') + '').toLowerCase();
+          
+          return (
+            title.includes(termLower) || 
+            description.includes(termLower) ||
+            company.includes(termLower)
+          );
+        });
+        
+        console.log(`RapidAPI: Found ${relevantJobs.length} internships for search term "${term}"`);
+        
+        // Map to our Internship format
+        const mappedJobs = relevantJobs.map((internship: any) => ({
+          id: `rapidapi-${internship.id || Math.random().toString(36).substring(2, 11)}`,
+          title: internship.title || 'Internship Opportunity',
+          company_name: internship.company || 'Unknown Company',
+          company_logo: internship.logo || `https://logo.clearbit.com/${(internship.company || 'company').toLowerCase().replace(/[^a-z0-9]/g, '')}.com`,
+          url: internship.url || '#',
+          category: internship.category || term,
+          tags: internship.tags || [term.toLowerCase(), 'internship', 'entry-level'],
+          job_type: 'internship',
+          publication_date: internship.posted_date || new Date().toISOString(),
+          candidate_required_location: internship.location || 'Remote',
+          salary: internship.salary || 'Competitive',
+          description: internship.description || `Internship opportunity at ${internship.company || 'a company'}`
+        }));
+        
+        if (mappedJobs.length > 0) {
+          results.push({
+            jobs: mappedJobs,
+            source: 'rapidapi',
+            query: term
+          });
+        }
+      }
+      
+      return results;
+    } catch (error) {
+      console.error('Error fetching from RapidAPI:', error);
+      throw error;
+    }
+  } catch (error) {
+    console.error('Error in searchRapidAPIInternships:', error);
+    return [];
+  }
+}
+
 export interface RemotiveJob {
   id: string;
   url: string;
@@ -175,6 +275,8 @@ export async function searchGoogleForInternships(
             company_name: "Major Tech Companies",
             company_logo: "https://logo.clearbit.com/google.com",
             url: `https://www.google.com/search?q=${encodeURIComponent(`${term} internship`)}`,
+            category: term,
+            tags: [term.toLowerCase(), 'internship', 'summer'],
             job_type: "internship",
             publication_date: new Date().toISOString(),
             candidate_required_location: "Remote/Hybrid",
@@ -187,6 +289,8 @@ export async function searchGoogleForInternships(
             company_name: "Leading Employers",
             company_logo: "https://logo.clearbit.com/linkedin.com", 
             url: `https://www.google.com/search?q=${encodeURIComponent(`entry level ${term} jobs`)}`,
+            category: term,
+            tags: [term.toLowerCase(), 'entry-level', 'graduate'],
             job_type: "entry_level",
             publication_date: new Date().toISOString(),
             candidate_required_location: "Various Locations",
@@ -226,7 +330,7 @@ export async function searchGoogleForInternships(
 export async function findInternships(
   jobTitles: string[] = [],
   keywords: string[] = []
-): Promise<{ remotive: InternshipSearchResult[], google?: any[] }> {
+): Promise<{ rapidapi?: InternshipSearchResult[], remotive: InternshipSearchResult[], google?: any[] }> {
   try {
     // Combine job titles and keywords for search, ensuring uniqueness
     const combinedTerms = [...jobTitles, ...keywords];
@@ -242,26 +346,57 @@ export async function findInternships(
     // Limit to reasonable number of terms
     const limitedTerms = searchTerms.slice(0, 5);
     
-    // Search Remotive first
-    const remotiveResults = await searchRemotiveInternships(limitedTerms);
+    console.log('Starting internship search with terms:', limitedTerms);
     
-    // Check if Remotive returned any real (non-mockup) results
-    const hasRealRemotiveResults = remotiveResults.some(result => 
-      result.source === 'remotive' && result.jobs && result.jobs.length > 0
-    );
+    // Try RapidAPI first (the primary source)
+    let rapidApiResults: InternshipSearchResult[] = [];
+    let hasRapidApiResults = false;
     
-    console.log('Checking if Remotive returned real results:', hasRealRemotiveResults);
-    console.log('Remotive results details:', remotiveResults.map(r => ({
-      source: r.source,
-      query: r.query,
-      jobCount: r.jobs?.length || 0
-    })));
+    try {
+      console.log('Searching internships using primary source: RapidAPI');
+      rapidApiResults = await searchRapidAPIInternships(limitedTerms);
+      
+      hasRapidApiResults = rapidApiResults.some(result => 
+        result.source === 'rapidapi' && result.jobs && result.jobs.length > 0
+      );
+      
+      console.log('RapidAPI internship search complete. Success:', hasRapidApiResults);
+      console.log('RapidAPI results breakdown:', rapidApiResults.map(r => ({
+        source: r.source,
+        query: r.query,
+        jobCount: r.jobs?.length || 0
+      })));
+    } catch (rapidApiError) {
+      console.error('Error with RapidAPI internship search:', rapidApiError);
+      console.log('Will try fallback sources...');
+    }
     
+    // If RapidAPI didn't return results, try Remotive as first fallback
+    let remotiveResults: InternshipSearchResult[] = [];
+    let hasRealRemotiveResults = false;
+    
+    if (!hasRapidApiResults) {
+      console.log('No results from RapidAPI, falling back to Remotive...');
+      
+      remotiveResults = await searchRemotiveInternships(limitedTerms);
+      
+      hasRealRemotiveResults = remotiveResults.some(result => 
+        result.source === 'remotive' && result.jobs && result.jobs.length > 0
+      );
+      
+      console.log('Checking if Remotive returned real results:', hasRealRemotiveResults);
+      console.log('Remotive results details:', remotiveResults.map(r => ({
+        source: r.source,
+        query: r.query,
+        jobCount: r.jobs?.length || 0
+      })));
+    }
+    
+    // If neither RapidAPI nor Remotive returned real results, try Google as final fallback
     let googleResults = null;
     
-    // If Remotive didn't return any real results, try Google as fallback
-    if (!hasRealRemotiveResults) {
-      console.log('No real results from Remotive API, falling back to Google Programmable Search...');
+    if (!hasRapidApiResults && !hasRealRemotiveResults) {
+      console.log('No real results from either RapidAPI or Remotive, falling back to Google Programmable Search...');
       
       // Use Google Programmable Search as fallback
       googleResults = await searchGoogleForInternships(limitedTerms);
@@ -272,7 +407,19 @@ export async function findInternships(
       );
     }
     
+    // Calculate stats for logs
+    const rapidApiJobCount = rapidApiResults?.reduce((total, cat) => total + (cat.jobs?.length || 0), 0) || 0;
+    const remotiveJobCount = remotiveResults?.reduce((total, cat) => total + (cat.jobs?.length || 0), 0) || 0;
+    const googleJobCount = googleResults?.reduce((total, cat) => total + (cat.jobs?.length || 0), 0) || 0;
+    
+    console.log('Internship search complete. Results summary:');
+    console.log(`- RapidAPI: ${rapidApiJobCount} jobs (Success: ${hasRapidApiResults})`);
+    console.log(`- Remotive: ${remotiveJobCount} jobs (Success: ${hasRealRemotiveResults})`);
+    console.log(`- Google: ${googleJobCount} jobs`);
+    console.log(`- Total: ${rapidApiJobCount + remotiveJobCount + googleJobCount} jobs`);
+    
     return {
+      ...(hasRapidApiResults ? { rapidapi: rapidApiResults } : {}),
       remotive: remotiveResults,
       ...(googleResults ? { google: googleResults } : {})
     };

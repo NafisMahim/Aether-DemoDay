@@ -90,12 +90,45 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
         const allInternships: Internship[] = []
         const internshipsByCategory: Record<string, Internship[]> = {}
         
-        // Process Remotive results
+        // Process RapidAPI results (primary source)
+        if (data.results.rapidapi && Array.isArray(data.results.rapidapi)) {
+          console.log("Processing RapidAPI results:", data.results.rapidapi);
+          data.results.rapidapi.forEach((result: any) => {
+            if (!result || !result.query) {
+              console.warn("Invalid RapidAPI result object:", result);
+              return;
+            }
+            
+            const categoryName = result.query;
+            const categoryJobs = result.jobs || [];
+            
+            console.log(`Processing RapidAPI category ${categoryName} with ${categoryJobs.length} jobs`);
+            
+            if (!internshipsByCategory[categoryName]) {
+              internshipsByCategory[categoryName] = [];
+            }
+            
+            internshipsByCategory[categoryName] = [
+              ...internshipsByCategory[categoryName],
+              ...categoryJobs
+            ];
+            
+            allInternships.push(...categoryJobs);
+          });
+        }
+        
+        // Process Remotive results (first fallback)
         if (data.results.remotive && Array.isArray(data.results.remotive)) {
-          console.log("Processing remotive results:", data.results.remotive);
+          console.log("Processing Remotive results:", data.results.remotive);
+          
+          // Only show fallback message if we're using Remotive as the primary source
+          if (data.apiStatus?.primarySource === 'remotive') {
+            setApiStatusMessage('The primary internship API is currently not returning results. Showing Remotive API results instead.');
+          }
+          
           data.results.remotive.forEach((result: any) => {
             if (!result || !result.query) {
-              console.warn("Invalid result object:", result);
+              console.warn("Invalid Remotive result object:", result);
               return;
             }
             
@@ -116,16 +149,16 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
             allInternships.push(...categoryJobs);
           });
         } else {
-          console.warn("No remotive results found in API response:", data.results);
+          console.warn("No Remotive results found in API response:", data.results);
         }
         
-        // Process Google search results if available
+        // Process Google search results if available (second fallback)
         if (data.results.google && Array.isArray(data.results.google)) {
           console.log("Processing Google search results:", data.results.google);
           
           // Update API status message to inform user we're using Google search
-          if (data.apiStatus?.remotive === 'unavailable' && apiStatusMessage) {
-            setApiStatusMessage('The Remotive API is currently not returning results. Showing Google search results as an alternative.');
+          if (data.apiStatus?.primarySource === 'google') {
+            setApiStatusMessage('The primary internship APIs are currently not returning results. Showing Google search results as an alternative.');
           }
           
           data.results.google.forEach((result: any) => {
@@ -151,14 +184,17 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
             
             allInternships.push(...categoryJobs);
           });
-          
-          // Log the complete data after processing
-          console.log("Final internships data:", {
-            categories: Object.keys(internshipsByCategory),
-            totalJobs: allInternships.length,
-            googleJobs: allInternships.filter(job => job.id.toString().startsWith('google-')).length
-          });
         }
+        
+        // Log the complete data after processing
+        console.log("Final internships data:", {
+          categories: Object.keys(internshipsByCategory),
+          totalJobs: allInternships.length,
+          rapidApiJobs: allInternships.filter(job => job.id.toString().startsWith('rapidapi-')).length,
+          remotiveJobs: allInternships.filter(job => !job.id.toString().startsWith('rapidapi-') && !job.id.toString().startsWith('google-') && !job.id.toString().startsWith('mock-')).length,
+          googleJobs: allInternships.filter(job => job.id.toString().startsWith('google-')).length,
+          mockJobs: allInternships.filter(job => job.id.toString().startsWith('mock-')).length
+        });
         
         // Set the internships data
         setInternships(allInternships)
@@ -229,14 +265,33 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
               </svg>
               <div>
                 <p className="font-medium">{apiStatusMessage}</p>
-                {/* Show different explanation based on data source */}
-                {apiStatusMessage?.includes('Google search') ? (
+                {/* Show different explanation based on data source indicated in the apiStatusMessage */}
+                {apiStatusMessage?.includes('RapidAPI') && (
+                  <p className="mt-1 text-xs text-amber-700">
+                    Using RapidAPI's Internships API for the most up-to-date listings.
+                  </p>
+                )}
+                {apiStatusMessage?.includes('Remotive API') && (
+                  <p className="mt-1 text-xs text-amber-700">
+                    Using Remotive API as a fallback to find remote internship opportunities.
+                  </p>
+                )}
+                {apiStatusMessage?.includes('Google search') && (
                   <p className="mt-1 text-xs text-amber-700">
                     Results are from Google search and will link out to job listing sites.
                   </p>
-                ) : (
+                )}
+                {apiStatusMessage?.includes('example') && (
                   <p className="mt-1 text-xs text-amber-700">
                     The internship listings shown are example data for demonstration purposes.
+                  </p>
+                )}
+                {!apiStatusMessage?.includes('RapidAPI') && 
+                 !apiStatusMessage?.includes('Remotive API') && 
+                 !apiStatusMessage?.includes('Google search') && 
+                 !apiStatusMessage?.includes('example') && (
+                  <p className="mt-1 text-xs text-amber-700">
+                    We're using alternative sources to find internship opportunities for you.
                   </p>
                 )}
               </div>
@@ -318,13 +373,40 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
                   <div className="flex-1">
                     <div className="flex justify-between">
                       <h3 className="font-bold text-gray-900">{internship.title}</h3>
-                      {/* Source badge - show if it's from Google search */}
+                      {/* Source badges - show where the data comes from */}
+                      {internship.id.toString().startsWith('rapidapi-') && (
+                        <span className="bg-purple-50 text-purple-700 text-xs px-2 py-1 rounded-full flex items-center">
+                          <svg className="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M21 8c-1.45 0-2.26 1.44-1.93 2.51l-3.55 3.56c-.3-.09-.74-.09-1.04 0l-2.55-2.55c.24-.84-.07-1.71-.85-2.09.17-1.28-1.33-2.21-2.25-1.37-.52.48-.7 1.2-.52 1.84-1.14.36-1.61 1.57-.88 2.53.65.87 2.05.87 2.7 0 .17-.21.3-.47.36-.74l2.43 2.43c-.1.29-.1.65 0 .94l-3.55 3.56c-.95-.23-1.78.45-1.93 1.38-.16.97.47 1.94 1.52 2.01 1.04.08 1.94-.7 2.01-1.74.02-.28-.03-.54-.12-.78l3.48-3.48c.2.06.43.1.66.1 1.1 0 2-.9 2-2 0-.22-.04-.43-.1-.63l3.56-3.56c.24.1.5.15.78.13 1.02-.07 1.8-.97 1.73-1.99-.07-1.02-.97-1.8-1.99-1.73-.28.02-.54.11-.78.26L16.81 8.8c-.1-.24-.23-.46-.4-.63-.33-.33-.77-.52-1.23-.52s-.9.19-1.23.52c-.18.17-.31.39-.41.63l-2.6-2.6c.1-.24.16-.5.13-.78-.07-1.02-.97-1.8-1.99-1.73-1.02.07-1.8.97-1.73 1.99.02.28.11.53.26.77L4.2 9.8c-.24-.1-.5-.16-.78-.13-1.02.07-1.8.97-1.73 1.99.07 1.02.97 1.8 1.99 1.73.28-.02.54-.11.78-.26l3.56-3.56c.09.17.22.33.36.46.33.33.77.52 1.23.52s.9-.19 1.23-.52c.15-.15.28-.3.38-.47l2.59 2.59c-.09.3-.09.63 0 .92l-3.5 3.51c-.23-.1-.49-.16-.77-.14-1.02.07-1.8.97-1.73 1.99.07 1.02.97 1.8 1.99 1.73.28-.02.54-.11.78-.26l3.56-3.56c.1.24.25.46.43.63.33.33.77.52 1.23.52s.9-.19 1.23-.52c.36-.35.59-.86.59-1.41 0-.55-.23-1.06-.59-1.41-.33-.33-.77-.52-1.23-.52s-.9.19-1.23.52c-.18.17-.32.39-.41.63l-2.6-2.6c.1-.24.15-.5.13-.78-.02-.27-.11-.52-.25-.76l3.56-3.56c.89.32 1.87-.11 2.17-1 .31-.89-.11-1.87-1-2.18z"/>
+                          </svg>
+                          RapidAPI
+                        </span>
+                      )}
+                      {!internship.id.toString().startsWith('rapidapi-') && 
+                       !internship.id.toString().startsWith('google-') && 
+                       !internship.id.toString().startsWith('mock-') && (
+                        <span className="bg-green-50 text-green-700 text-xs px-2 py-1 rounded-full flex items-center">
+                          <svg className="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8z"/>
+                            <path d="M11 11h2v6h-2zm0-4h2v2h-2z"/>
+                          </svg>
+                          Remotive
+                        </span>
+                      )}
                       {internship.id.toString().startsWith('google-') && (
                         <span className="bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded-full flex items-center">
                           <svg className="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"/>
                           </svg>
                           Google Search
+                        </span>
+                      )}
+                      {internship.id.toString().startsWith('mock-') && (
+                        <span className="bg-gray-50 text-gray-700 text-xs px-2 py-1 rounded-full flex items-center">
+                          <svg className="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M13 7h-2v4H7v2h4v4h2v-4h4v-2h-4V7zm-1-5C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
+                          </svg>
+                          Example
                         </span>
                       )}
                     </div>

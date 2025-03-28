@@ -93,34 +93,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Log search parameters for debugging
       console.log('Internship search parameters:', { jobTitles, keywords });
       
-      // Search for internships using the provided terms
+      // Search for internships using the provided terms with our tiered approach
       const results = await findInternships(
         jobTitles || [], 
         keywords || []
       );
       
-      // Check if we got any results from Remotive
+      // Track job counts from each source
+      let totalRapidApiJobs = 0;
+      let hasRapidApiResults = false;
+      
       let totalRemotiveJobs = 0;
-      let realApiJobs = 0;
+      let realRemotiveJobs = 0;
       let mockJobs = 0;
       
+      let totalGoogleJobs = 0;
+      let hasGoogleResults = false;
+      
+      // Process RapidAPI results (primary source)
+      if (results.rapidapi) {
+        results.rapidapi.forEach(category => {
+          const categoryJobs = category.jobs?.length || 0;
+          totalRapidApiJobs += categoryJobs;
+          
+          if (categoryJobs > 0) {
+            hasRapidApiResults = true;
+          }
+        });
+      }
+      
+      // Process Remotive results (first fallback)
       if (results.remotive) {
         results.remotive.forEach(category => {
           const categoryJobs = category.jobs?.length || 0;
           totalRemotiveJobs += categoryJobs;
           
           if (category.source === 'remotive') {
-            realApiJobs += categoryJobs;
+            realRemotiveJobs += categoryJobs;
           } else if (category.source === 'mockup') {
             mockJobs += categoryJobs;
           }
         });
       }
       
-      // Check if we have Google search results
-      let totalGoogleJobs = 0;
-      let hasGoogleResults = false;
-      
+      // Process Google search results (second fallback)
       if (results.google && Array.isArray(results.google)) {
         results.google.forEach(category => {
           const categoryJobs = category.jobs?.length || 0;
@@ -132,36 +148,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      const totalJobs = totalRemotiveJobs + totalGoogleJobs;
+      // Calculate total job count from all sources
+      const totalJobs = totalRapidApiJobs + totalRemotiveJobs + totalGoogleJobs;
       
-      console.log(`Found ${totalJobs} total internships across ${results.remotive?.length || 0} categories`);
-      console.log(`Remotive API jobs: ${realApiJobs}, Mock jobs: ${mockJobs}, Google jobs: ${totalGoogleJobs}`);
+      console.log(`Found ${totalJobs} total internships`);
+      console.log(`RapidAPI jobs: ${totalRapidApiJobs}, Remotive API jobs: ${realRemotiveJobs}, Mock jobs: ${mockJobs}, Google jobs: ${totalGoogleJobs}`);
       
-      // Determine API status
+      // Determine which API source is being used and its status
+      const primarySource = hasRapidApiResults ? 'rapidapi' : 
+                            (realRemotiveJobs > 0 ? 'remotive' : 
+                            (hasGoogleResults ? 'google' : 'none'));
+      
+      // Determine API status for all sources
       const apiStatus = {
-        remotive: realApiJobs > 0 ? 'available' : 'unavailable',
+        rapidapi: hasRapidApiResults ? 'available' : 'unavailable',
+        remotive: realRemotiveJobs > 0 ? 'available' : 'unavailable',
         google: hasGoogleResults ? 'available' : 'unavailable',
-        usingFallback: realApiJobs === 0 && (mockJobs > 0 || hasGoogleResults)
+        primarySource: primarySource,
+        usingFallback: !hasRapidApiResults && (realRemotiveJobs > 0 || hasGoogleResults || mockJobs > 0)
       };
       
       // Determine appropriate message based on results
       let message;
       if (totalJobs === 0) {
         message = 'No internships found for your search criteria';
-      } else if (realApiJobs === 0 && hasGoogleResults) {
-        message = 'The Remotive API is currently not returning results. Showing Google search results instead.';
-      } else if (realApiJobs === 0 && mockJobs > 0) {
-        message = 'The Remotive API is currently not returning results. Showing example internship listings instead.';
+      } else if (hasRapidApiResults) {
+        message = `Found ${totalJobs} internship opportunities from RapidAPI Internships`;
+      } else if (realRemotiveJobs > 0) {
+        message = `The primary API is unavailable. Found ${totalJobs} internship opportunities from Remotive API instead.`;
+      } else if (hasGoogleResults) {
+        message = `Both primary APIs are unavailable. Showing Google search results for internships instead.`;
+      } else if (mockJobs > 0) {
+        message = `API services are currently unavailable. Showing example internship listings instead.`;
       } else {
         message = `Found ${totalJobs} internship opportunities`;
       }
       
+      // Create response with source information
       return res.status(200).json({
         success: true,
         results: results,
         message: message,
         totalJobs: totalJobs,
-        categories: results.remotive?.length || 0,
+        categories: {
+          rapidapi: results.rapidapi?.length || 0,
+          remotive: results.remotive?.length || 0,
+          google: results.google?.length || 0
+        },
         apiStatus: apiStatus
       });
     } catch (error) {
