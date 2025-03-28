@@ -2,6 +2,7 @@ import { useState } from "react"
 import { useToast } from "@/hooks/use-toast"
 import BottomNavigation from "../ui/BottomNavigation"
 import CategoryButton from "../ui/CategoryButton"
+import aetherLogo from "@/assets/aether-logo.png"
 
 interface HomeScreenProps {
   username: string
@@ -27,10 +28,10 @@ export default function HomeScreen({ username, navigateTo, quizResults }: HomeSc
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <header className="flex items-center justify-between px-5 mobile-header">
+      <header className="flex items-center justify-between px-5">
         <div className="flex items-center">
           <div className="relative w-[40px] h-[40px]">
-            <img src="/assets/aether-logo.svg" alt="Aether Logo" className="w-full h-full object-contain" />
+            <img src={aetherLogo} alt="Aether Logo" className="w-full h-full object-contain" />
           </div>
         </div>
 
