@@ -522,7 +522,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log('Generating career analysis with Gemini AI...');
       
-      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+      const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
       
       // Format the prompt with the career data
       const prompt = `
@@ -629,7 +629,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Career data is required' });
       }
       
-      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+      const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
       
       // Create a prompt based on career data
       const primaryType = careerData.primaryType;
