@@ -101,18 +101,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if we got any results
       let totalJobs = 0;
+      let realApiJobs = 0;
+      let mockJobs = 0;
+      
       if (results.remotive) {
-        totalJobs = results.remotive.reduce((sum, category) => sum + (category.jobs?.length || 0), 0);
+        results.remotive.forEach(category => {
+          const categoryJobs = category.jobs?.length || 0;
+          totalJobs += categoryJobs;
+          
+          if (category.source === 'remotive') {
+            realApiJobs += categoryJobs;
+          } else if (category.source === 'mockup') {
+            mockJobs += categoryJobs;
+          }
+        });
       }
       
       console.log(`Found ${totalJobs} total internships across ${results.remotive?.length || 0} categories`);
+      console.log(`API jobs: ${realApiJobs}, Mock jobs: ${mockJobs}`);
+      
+      // Determine appropriate message based on results
+      let message;
+      if (totalJobs === 0) {
+        message = 'No internships found for your search criteria';
+      } else if (realApiJobs === 0 && mockJobs > 0) {
+        message = 'The Remotive API is currently not returning results. Showing example internship listings instead.';
+      } else {
+        message = `Found ${totalJobs} internship opportunities`;
+      }
       
       return res.status(200).json({
         success: true,
         results: results,
-        message: totalJobs > 0 
-          ? `Found ${totalJobs} internship opportunities` 
-          : 'No internships found for your search criteria'
+        message: message,
+        totalJobs: totalJobs,
+        categories: results.remotive?.length || 0,
+        apiStatus: realApiJobs > 0 ? 'available' : 'unavailable'
       });
     } catch (error) {
       console.error('Internship search error:', error);

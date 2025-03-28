@@ -32,6 +32,7 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [careerCategories, setCareerCategories] = useState<string[]>([])
   const [categoryJobs, setCategoryJobs] = useState<Record<string, Internship[]>>({})
+  const [apiStatusMessage, setApiStatusMessage] = useState<string | null>(null)
 
   // Search for internships based on quiz results and interests
   useEffect(() => {
@@ -69,27 +70,53 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
           throw new Error(data.message || "Failed to search for internships")
         }
         
+        // Handle API status message if present
+        if (data.message) {
+          console.log("API message:", data.message)
+          
+          if (data.apiStatus === 'unavailable' && data.totalJobs > 0) {
+            setApiStatusMessage(data.message)
+            toast({
+              title: "Note",
+              description: data.message,
+              variant: "default"
+            })
+          } else {
+            setApiStatusMessage(null)
+          }
+        }
+        
         // Process the results
         const allInternships: Internship[] = []
         const internshipsByCategory: Record<string, Internship[]> = {}
         
         // Process Remotive results
         if (data.results.remotive && Array.isArray(data.results.remotive)) {
+          console.log("Processing remotive results:", data.results.remotive);
           data.results.remotive.forEach((result: any) => {
-            const categoryName = result.query
-            const categoryJobs = result.jobs || []
+            if (!result || !result.query) {
+              console.warn("Invalid result object:", result);
+              return;
+            }
+            
+            const categoryName = result.query;
+            const categoryJobs = result.jobs || [];
+            
+            console.log(`Processing category ${categoryName} with ${categoryJobs.length} jobs`);
             
             if (!internshipsByCategory[categoryName]) {
-              internshipsByCategory[categoryName] = []
+              internshipsByCategory[categoryName] = [];
             }
             
             internshipsByCategory[categoryName] = [
               ...internshipsByCategory[categoryName],
               ...categoryJobs
-            ]
+            ];
             
-            allInternships.push(...categoryJobs)
-          })
+            allInternships.push(...categoryJobs);
+          });
+        } else {
+          console.warn("No remotive results found in API response:", data.results);
         }
         
         // Set the internships data
@@ -151,6 +178,21 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
             Discover internship opportunities tailored to your career profile and interests.
           </p>
         </div>
+        
+        {/* API Status Banner */}
+        {!isLoading && apiStatusMessage && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-3 mb-4 text-sm">
+            <div className="flex">
+              <svg className="h-5 w-5 text-amber-600 mr-2 mt-0.5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.485 3.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 3.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+              </svg>
+              <div>
+                <p className="font-medium">{apiStatusMessage}</p>
+                <p className="mt-1 text-xs text-amber-700">The internship listings shown are example data for demonstration purposes.</p>
+              </div>
+            </div>
+          </div>
+        )}
         
         {/* Career Category Pills */}
         {careerCategories.length > 0 && (
