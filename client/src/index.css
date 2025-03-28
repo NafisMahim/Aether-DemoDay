@@ -2,6 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Global styles for screen headers and proper spacing */
+header {
+  padding-top: 1.25rem !important; /* Ensure consistent padding at the top of all screens */
+}
+
+/* Ensure content doesn't get too close to the top */
+.screen-content {
+  padding-top: 0.75rem;
+}
+
+/* Add additional padding for screens with dynamic island */
+.dynamic-island-padding {
+  padding-top: 2rem !important;
+}
+
 @layer base {
   * {
     @apply border-border;

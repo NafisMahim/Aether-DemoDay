@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import aetherLogo from "@/assets/aether-logo.png"
 
 interface LoginScreenProps {
   username: string
@@ -33,7 +34,7 @@ export default function LoginScreen({
       <div className="w-full max-w-[320px] bg-white rounded-xl shadow-md p-6">
         <div className="flex justify-center mb-4">
           <div className="relative w-[100px] h-[100px]">
-            <img src="/assets/aether-logo.svg" alt="Aether Logo" className="w-full h-full object-contain" />
+            <img src={aetherLogo} alt="Aether Logo" className="w-full h-full object-contain" />
           </div>
         </div>
 

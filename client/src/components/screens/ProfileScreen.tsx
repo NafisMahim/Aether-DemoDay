@@ -17,10 +17,10 @@ export default function ProfileScreen({ handleBack, username, quizResults, bio }
   const [editedBio, setEditedBio] = useState(bio)
   const firstLetter = username.charAt(0)
 
-  const personalityType = quizResults ? quizResults.personalityType : "Take a quiz to discover your type"
-  const description = quizResults ? quizResults.description : "Your personality analysis will appear here after completing a quiz."
-  const strengths = quizResults ? quizResults.strengths : []
-  const weaknesses = quizResults ? quizResults.weaknesses : []
+  const personalityType = quizResults?.personalityType || "Take a quiz to discover your type"
+  const description = quizResults?.description || "Your personality analysis will appear here after completing a quiz."
+  const strengths = quizResults?.strengths || []
+  const weaknesses = quizResults?.weaknesses || []
 
   const handleSaveBio = () => {
     setIsEditing(false)
