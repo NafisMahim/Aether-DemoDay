@@ -40,7 +40,7 @@ export default function EditProfileScreen({
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  // Handle profile image upload
+  // Handle profile image upload with compression
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -55,14 +55,54 @@ export default function EditProfileScreen({
       return
     }
 
+    // Function to compress image
+    const compressImage = (base64: string, maxWidth = 800, quality = 0.8): Promise<string> => {
+      return new Promise((resolve) => {
+        const img = new Image()
+        img.src = base64
+        img.onload = () => {
+          // Create canvas and get context
+          const canvas = document.createElement('canvas')
+          const ctx = canvas.getContext('2d')
+          
+          // Calculate new dimensions while maintaining aspect ratio
+          let width = img.width
+          let height = img.height
+          
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width
+            width = maxWidth
+          }
+          
+          // Set canvas dimensions and draw the image
+          canvas.width = width
+          canvas.height = height
+          ctx?.drawImage(img, 0, 0, width, height)
+          
+          // Get compressed image as base64 string
+          const compressedBase64 = canvas.toDataURL('image/jpeg', quality)
+          resolve(compressedBase64)
+        }
+      })
+    }
+
     // Preview the image
     const reader = new FileReader()
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       if (event.target?.result) {
         const imageData = event.target.result as string
         setProfileImagePreview(imageData)
-        // Store the actual base64 image data
-        setFormData(prev => ({ ...prev, profileImage: imageData }))
+        
+        try {
+          // Compress image before storing it
+          const compressedImage = await compressImage(imageData)
+          // Store the compressed base64 image data
+          setFormData(prev => ({ ...prev, profileImage: compressedImage }))
+        } catch (error) {
+          console.error("Error compressing image:", error)
+          // Fallback to original image if compression fails
+          setFormData(prev => ({ ...prev, profileImage: imageData }))
+        }
       }
     }
     reader.readAsDataURL(file)
