@@ -8,9 +8,10 @@ interface HomeScreenProps {
   username: string
   navigateTo: (page: string) => void
   quizResults: any
+  profileImage?: string
 }
 
-export default function HomeScreen({ username, navigateTo, quizResults }: HomeScreenProps) {
+export default function HomeScreen({ username, navigateTo, quizResults, profileImage }: HomeScreenProps) {
   const { toast } = useToast()
   const [notifications, setNotifications] = useState(3)
 
@@ -53,12 +54,25 @@ export default function HomeScreen({ username, navigateTo, quizResults }: HomeSc
       {/* User Profile */}
       <section className="px-5 mt-2">
         <div className="bg-white border-2 border-gray-200 rounded-xl shadow-md p-5 flex flex-col items-center">
-          <div 
-            className="w-16 h-16 bg-gray-200 rounded-xl mb-3 flex items-center justify-center text-2xl font-bold text-gray-400"
-            onClick={() => navigateTo("profile")}
-          >
-            {firstLetter}
-          </div>
+          {profileImage ? (
+            <div 
+              className="w-16 h-16 rounded-xl mb-3 overflow-hidden cursor-pointer"
+              onClick={() => navigateTo("profile")}
+            >
+              <img 
+                src={profileImage} 
+                alt={username} 
+                className="w-full h-full object-cover"
+              />
+            </div>
+          ) : (
+            <div 
+              className="w-16 h-16 bg-gray-200 rounded-xl mb-3 flex items-center justify-center text-2xl font-bold text-gray-400 cursor-pointer"
+              onClick={() => navigateTo("profile")}
+            >
+              {firstLetter}
+            </div>
+          )}
           <h2 className="text-lg font-bold">{username}</h2>
           <p className="text-xs text-gray-500 italic mt-1">"{quizResults?.bio || "Exploring new opportunities and personal growth!"}"</p>
         </div>

@@ -12,9 +12,10 @@ interface ProfileScreenProps {
   onLogout?: () => Promise<void>
   navigateTo?: (screen: string) => void
   onBioChange?: (newBio: string) => void
+  profileImage?: string
 }
 
-export default function ProfileScreen({ handleBack, username, quizResults, bio, onLogout, navigateTo = () => {}, onBioChange }: ProfileScreenProps) {
+export default function ProfileScreen({ handleBack, username, quizResults, bio, onLogout, navigateTo = () => {}, onBioChange, profileImage }: ProfileScreenProps) {
   const { toast } = useToast()
   const [isEditing, setIsEditing] = useState(false)
   const [editedBio, setEditedBio] = useState(bio)
@@ -104,9 +105,19 @@ export default function ProfileScreen({ handleBack, username, quizResults, bio, 
         {/* Profile Card */}
         <div className="bg-white rounded-xl shadow-md p-5 mb-6">
           <div className="flex items-center mb-4">
-            <div className="w-16 h-16 bg-blue-100 rounded-xl mr-4 flex items-center justify-center text-2xl font-bold text-blue-500">
-              {firstLetter}
-            </div>
+            {profileImage ? (
+              <div className="w-16 h-16 rounded-xl mr-4 overflow-hidden">
+                <img 
+                  src={profileImage} 
+                  alt={username} 
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ) : (
+              <div className="w-16 h-16 bg-blue-100 rounded-xl mr-4 flex items-center justify-center text-2xl font-bold text-blue-500">
+                {firstLetter}
+              </div>
+            )}
             <div>
               <h2 className="text-xl font-bold">{username}</h2>
               <p className="text-sm text-gray-500">Member since 2023</p>

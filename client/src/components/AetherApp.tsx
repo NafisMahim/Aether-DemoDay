@@ -52,6 +52,7 @@ export default function AetherApp() {
   const [userData, setUserData] = useState({
     name: "Richard Wang",
     bio: "Exploring new opportunities and personal growth!",
+    profileImage: "",
     interests: [
       { id: 1, category: "Technology", subcategories: "Web Development, AI, Mobile Apps" },
       { id: 2, category: "Travel", subcategories: "Hiking, Backpacking, Urban Exploration" },
@@ -77,6 +78,7 @@ export default function AetherApp() {
           setUserData({
             name: data.user.displayName || data.user.username,
             bio: data.user.bio || "Exploring new opportunities and personal growth!",
+            profileImage: data.user.profileImage || "",
             interests: userData.interests // Keep default interests for now
           })
           setCurrentScreen("home")
@@ -104,7 +106,8 @@ export default function AetherApp() {
         setErrorMessage("")
         setUserData({
           ...userData, 
-          name: data.user.displayName || data.user.username
+          name: data.user.displayName || data.user.username,
+          profileImage: data.user.profileImage || ""
         })
         toast({
           title: "Login successful",
@@ -135,7 +138,8 @@ export default function AetherApp() {
         setErrorMessage("")
         setUserData({
           ...userData,
-          name: data.user.displayName || data.user.username
+          name: data.user.displayName || data.user.username,
+          profileImage: data.user.profileImage || ""
         })
         toast({
           title: "Account created",
@@ -290,11 +294,23 @@ export default function AetherApp() {
               username={userData.name} 
               navigateTo={navigateTo} 
               quizResults={{...quizResults, bio: userData.bio}} 
+              profileImage={userData.profileImage}
             />
           ) : currentScreen === "quiz" ? (
             <QuizScreen handleBack={handleBack} />
           ) : currentScreen === "interests" ? (
-            <InterestsScreen handleBack={handleBack} interests={userData.interests} setUserData={setUserData} />
+            <InterestsScreen 
+              handleBack={handleBack} 
+              interests={userData.interests} 
+              setUserData={(newData) => {
+                // Handle the missing profileImage field
+                setUserData({
+                  ...userData,
+                  ...newData,
+                  profileImage: userData.profileImage // Preserve the profile image
+                })
+              }} 
+            />
           ) : currentScreen === "experience" ? (
             <ExperienceScreen handleBack={handleBack} />
           ) : currentScreen === "financials" ? (
@@ -307,6 +323,7 @@ export default function AetherApp() {
               username={userData.name} 
               quizResults={quizResults} 
               bio={userData.bio} 
+              profileImage={userData.profileImage}
               onLogout={handleLogout}
               navigateTo={navigateTo}
               onBioChange={(newBio) => {
@@ -319,10 +336,14 @@ export default function AetherApp() {
                 if (quizResults) {
                   setQuizResults({
                     ...quizResults,
-                    bio: newBio
+                    bio: newBio,
+                    profileImage: userData.profileImage // Preserve profile image
                   })
                 } else {
-                  setQuizResults({ bio: newBio })
+                  setQuizResults({ 
+                    bio: newBio,
+                    profileImage: userData.profileImage // Preserve profile image
+                  })
                 }
               }}
             />
@@ -342,6 +363,7 @@ export default function AetherApp() {
                 username: user?.username || "",
                 email: user?.email || "",
                 bio: userData.bio,
+                profileImage: userData.profileImage
               }} 
               onSave={async (updatedData) => {
                 // In a real app, we would save the data to the server
@@ -349,16 +371,21 @@ export default function AetherApp() {
                   ...userData,
                   name: updatedData.name,
                   bio: updatedData.bio,
+                  profileImage: updatedData.profileImage || userData.profileImage
                 })
                 
                 // Update quiz results to include bio so it shows on home screen
                 if (quizResults) {
                   setQuizResults({
                     ...quizResults,
-                    bio: updatedData.bio
+                    bio: updatedData.bio,
+                    profileImage: updatedData.profileImage || userData.profileImage
                   })
                 } else {
-                  setQuizResults({ bio: updatedData.bio })
+                  setQuizResults({ 
+                    bio: updatedData.bio,
+                    profileImage: updatedData.profileImage || userData.profileImage
+                  })
                 }
                 
                 toast({
