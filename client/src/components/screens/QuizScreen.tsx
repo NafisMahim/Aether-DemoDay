@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { useToast } from "@/hooks/use-toast"
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts"
+import { apiRequest } from "@/lib/queryClient"
+import { Loader2 } from "lucide-react"
 
 interface QuizScreenProps {
   handleBack: (data?: any) => void
@@ -28,6 +30,9 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
   const [selectedOptions, setSelectedOptions] = useState<Record<number, string>>({})
   const [showResults, setShowResults] = useState(false)
   const [progress, setProgress] = useState(10)
+  const [aiAnalysis, setAiAnalysis] = useState<string>("")
+  const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
   
   const questions: QuizQuestion[] = [
     {
@@ -149,8 +154,34 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
     if (currentQuestion < totalQuestions) {
       setCurrentQuestion(currentQuestion + 1)
     } else {
-      // Show results
+      // Show results and generate AI analysis
       setShowResults(true)
+      fetchAiAnalysis()
+    }
+  }
+  
+  // Fetch career analysis from Gemini AI
+  const fetchAiAnalysis = async () => {
+    try {
+      setIsLoadingAnalysis(true)
+      setAiError(null)
+      
+      const careerData = generateCareerData()
+      
+      const response = await apiRequest('POST', '/api/career-analysis', { careerData })
+      const data = await response.json()
+      
+      setAiAnalysis(data.analysis)
+    } catch (error) {
+      console.error('Error fetching AI career analysis:', error)
+      setAiError('Unable to generate AI career analysis. Please try again later.')
+      toast({
+        title: 'AI Analysis Error',
+        description: 'Failed to generate career insight. The AI service may be unavailable.',
+        variant: 'destructive'
+      })
+    } finally {
+      setIsLoadingAnalysis(false)
     }
   }
 
@@ -471,6 +502,35 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
               <div className="bg-blue-50 rounded-lg p-4 mb-6">
                 <h3 className="text-lg font-bold text-blue-800 mb-3">Career Recommendations</h3>
                 {renderCareerRecommendations()}
+              </div>
+              
+              {/* AI Career Analysis */}
+              <div className="bg-purple-50 rounded-lg p-4 mb-6">
+                <div className="flex items-center mb-3">
+                  <h3 className="text-lg font-bold text-purple-800">AI Career Analysis</h3>
+                  {isLoadingAnalysis && (
+                    <div className="ml-3">
+                      <svg className="animate-spin h-5 w-5 text-purple-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                
+                {aiError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+                    <p className="text-sm">{aiError}</p>
+                  </div>
+                )}
+                
+                {!isLoadingAnalysis && !aiError && aiAnalysis ? (
+                  <div className="text-sm text-gray-700 whitespace-pre-line">
+                    {aiAnalysis}
+                  </div>
+                ) : !isLoadingAnalysis && !aiError ? (
+                  <p className="text-sm text-gray-500 italic">Generating detailed career insights using AI...</p>
+                ) : null}
               </div>
               
               <Button

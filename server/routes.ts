@@ -6,6 +6,18 @@ import passport from "passport";
 import session from "express-session";
 import { configurePassport, hashPassword } from "./auth";
 import MemoryStore from "memorystore";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+// Initialize Gemini AI
+const geminiApiKey = process.env.GEMINI_API_KEY;
+let genAI: any = null;
+
+if (geminiApiKey) {
+  genAI = new GoogleGenerativeAI(geminiApiKey);
+  console.log("Gemini AI initialized successfully");
+} else {
+  console.warn("GEMINI_API_KEY not set. AI features will not be available.");
+}
 
 interface LoginRequest {
   username: string;
@@ -490,6 +502,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ message: 'Internal server error' });
     }
   });
+  
+  // ---------- AI CAREER ANALYSIS ----------
+  
+  // Generate career analysis with Gemini AI
+  app.post('/api/career-analysis', async (req, res) => {
+    try {
+      if (!genAI) {
+        return res.status(503).json({ 
+          message: "AI service is not available. Please ensure GEMINI_API_KEY is set in environment variables." 
+        });
+      }
+      
+      const { careerData } = req.body;
+      
+      if (!careerData || !careerData.primaryType || !careerData.secondaryType || !careerData.categories) {
+        return res.status(400).json({ message: 'Invalid or incomplete career data provided' });
+      }
+      
+      console.log('Generating career analysis with Gemini AI...');
+      
+      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+      
+      // Format the prompt with the career data
+      const prompt = `
+        Based on the following career assessment results, provide two detailed paragraphs of personalized career insights:
+        
+        Primary Career Dimension: ${careerData.primaryType.name} (${careerData.primaryType.score}%)
+        Description: ${careerData.primaryType.description}
+        
+        Secondary Career Dimension: ${careerData.secondaryType.name} (${careerData.secondaryType.score}%)
+        Description: ${careerData.secondaryType.description}
+        
+        Other Dimensions:
+        ${careerData.categories
+          .filter(cat => cat.name !== careerData.primaryType.name && cat.name !== careerData.secondaryType.name)
+          .map(cat => `${cat.name}: ${cat.score}%`)
+          .join('\n')
+        }
+        
+        Recommended Careers for Primary Dimension:
+        ${careerData.primaryType.careers.join(', ')}
+        
+        Recommended Hybrid Careers (combining primary and secondary):
+        ${careerData.hybridCareers.join(', ')}
+        
+        First paragraph: Focus on how these specific career dimensions reflect the person's strengths and natural aptitudes, and how they might manifest in different professional contexts. Be specific and detailed.
+        
+        Second paragraph: Provide forward-looking advice about how to leverage these strengths, potential development areas, and unexplored career paths that might be especially fulfilling given this particular combination of traits. Make it personalized and actionable.
+      `;
+      
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+      
+      console.log('AI analysis generated successfully');
+      
+      res.json({ 
+        analysis: text,
+        message: 'Career analysis generated successfully' 
+      });
+      
+    } catch (error) {
+      console.error("AI analysis error:", error);
+      res.status(500).json({ 
+        message: "Error generating AI analysis", 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
 
   // Google Auth routes
   app.get('/auth/google', 
@@ -526,6 +607,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(200).json({ 
         isAuthenticated: false,
         user: null
+      });
+    }
+  });
+
+  // ---------- AI CAREER ANALYSIS ----------
+  
+  // Generate career analysis using Gemini AI
+  app.post('/api/career-analysis', async (req, res) => {
+    try {
+      if (!genAI) {
+        return res.status(503).json({ 
+          message: 'AI service unavailable',
+          analysis: 'AI service is currently unavailable. Please try again later or contact support.'
+        });
+      }
+      
+      const { careerData } = req.body;
+      
+      if (!careerData) {
+        return res.status(400).json({ message: 'Career data is required' });
+      }
+      
+      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+      
+      // Create a prompt based on career data
+      const primaryType = careerData.primaryType;
+      const secondaryType = careerData.secondaryType;
+      const hybridCareers = careerData.hybridCareers;
+      
+      const prompt = `
+        Based on a career assessment, I have the following career dimension profile:
+        
+        Primary career dimension: ${primaryType.name} (${primaryType.score}%)
+        Description: ${primaryType.description}
+        
+        Secondary career dimension: ${secondaryType.name} (${secondaryType.score}%)
+        Description: ${secondaryType.description}
+        
+        Recommended careers that combine these dimensions include:
+        ${hybridCareers.join(', ')}
+        
+        Please provide a detailed career analysis (around 3-4 paragraphs) that:
+        1. Explains what this combination of career dimensions means for my professional path
+        2. Discusses how I can leverage these strengths in today's job market
+        3. Suggests specific steps I can take to develop these career dimensions further
+        4. Recommends education paths, certifications, or skill development opportunities
+        
+        Write in a professional but encouraging tone and format the response with proper paragraphs for readability.
+      `;
+      
+      // Generate the analysis
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const analysis = response.text();
+      
+      return res.status(200).json({ analysis });
+    } catch (error) {
+      console.error('AI career analysis error:', error);
+      return res.status(500).json({ 
+        message: 'AI analysis failed',
+        analysis: 'Unable to generate AI analysis at this time. Please try again later.'
       });
     }
   });
