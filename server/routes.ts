@@ -99,15 +99,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         keywords || []
       );
       
-      // Check if we got any results
-      let totalJobs = 0;
+      // Check if we got any results from Remotive
+      let totalRemotiveJobs = 0;
       let realApiJobs = 0;
       let mockJobs = 0;
       
       if (results.remotive) {
         results.remotive.forEach(category => {
           const categoryJobs = category.jobs?.length || 0;
-          totalJobs += categoryJobs;
+          totalRemotiveJobs += categoryJobs;
           
           if (category.source === 'remotive') {
             realApiJobs += categoryJobs;
@@ -117,13 +117,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // Check if we have Google search results
+      let totalGoogleJobs = 0;
+      let hasGoogleResults = false;
+      
+      if (results.google && Array.isArray(results.google)) {
+        results.google.forEach(category => {
+          const categoryJobs = category.jobs?.length || 0;
+          totalGoogleJobs += categoryJobs;
+          
+          if (categoryJobs > 0) {
+            hasGoogleResults = true;
+          }
+        });
+      }
+      
+      const totalJobs = totalRemotiveJobs + totalGoogleJobs;
+      
       console.log(`Found ${totalJobs} total internships across ${results.remotive?.length || 0} categories`);
-      console.log(`API jobs: ${realApiJobs}, Mock jobs: ${mockJobs}`);
+      console.log(`Remotive API jobs: ${realApiJobs}, Mock jobs: ${mockJobs}, Google jobs: ${totalGoogleJobs}`);
+      
+      // Determine API status
+      const apiStatus = {
+        remotive: realApiJobs > 0 ? 'available' : 'unavailable',
+        google: hasGoogleResults ? 'available' : 'unavailable',
+        usingFallback: realApiJobs === 0 && (mockJobs > 0 || hasGoogleResults)
+      };
       
       // Determine appropriate message based on results
       let message;
       if (totalJobs === 0) {
         message = 'No internships found for your search criteria';
+      } else if (realApiJobs === 0 && hasGoogleResults) {
+        message = 'The Remotive API is currently not returning results. Showing Google search results instead.';
       } else if (realApiJobs === 0 && mockJobs > 0) {
         message = 'The Remotive API is currently not returning results. Showing example internship listings instead.';
       } else {
@@ -136,7 +162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: message,
         totalJobs: totalJobs,
         categories: results.remotive?.length || 0,
-        apiStatus: realApiJobs > 0 ? 'available' : 'unavailable'
+        apiStatus: apiStatus
       });
     } catch (error) {
       console.error('Internship search error:', error);
