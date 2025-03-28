@@ -286,7 +286,11 @@ export default function AetherApp() {
               isLoading={signupMutation.isPending}
             />
           ) : currentScreen === "home" ? (
-            <HomeScreen username={userData.name} navigateTo={navigateTo} quizResults={quizResults} />
+            <HomeScreen 
+              username={userData.name} 
+              navigateTo={navigateTo} 
+              quizResults={{...quizResults, bio: userData.bio}} 
+            />
           ) : currentScreen === "quiz" ? (
             <QuizScreen handleBack={handleBack} />
           ) : currentScreen === "interests" ? (
@@ -305,6 +309,22 @@ export default function AetherApp() {
               bio={userData.bio} 
               onLogout={handleLogout}
               navigateTo={navigateTo}
+              onBioChange={(newBio) => {
+                // Update userData when bio is changed directly in profile
+                setUserData({
+                  ...userData,
+                  bio: newBio
+                })
+                // Also update quizResults
+                if (quizResults) {
+                  setQuizResults({
+                    ...quizResults,
+                    bio: newBio
+                  })
+                } else {
+                  setQuizResults({ bio: newBio })
+                }
+              }}
             />
           ) : currentScreen === "notifications" ? (
             <NotificationsScreen handleBack={handleBack} />

@@ -11,9 +11,10 @@ interface ProfileScreenProps {
   bio: string
   onLogout?: () => Promise<void>
   navigateTo?: (screen: string) => void
+  onBioChange?: (newBio: string) => void
 }
 
-export default function ProfileScreen({ handleBack, username, quizResults, bio, onLogout, navigateTo = () => {} }: ProfileScreenProps) {
+export default function ProfileScreen({ handleBack, username, quizResults, bio, onLogout, navigateTo = () => {}, onBioChange }: ProfileScreenProps) {
   const { toast } = useToast()
   const [isEditing, setIsEditing] = useState(false)
   const [editedBio, setEditedBio] = useState(bio)
@@ -62,10 +63,22 @@ export default function ProfileScreen({ handleBack, username, quizResults, bio, 
   const handleSaveBio = () => {
     setIsEditing(false)
     
-    // In a real app, we would update this on the server via an API call
-    if (quizResults) {
-      // Update the quiz results directly to include the bio
-      quizResults.bio = editedBio
+    // Use the prop to update parent state if available
+    if (onBioChange) {
+      onBioChange(editedBio)
+    } else {
+      // Fallback to direct mutation if callback isn't provided
+      if (quizResults) {
+        quizResults.bio = editedBio
+      }
+      
+      // Force a navigation to home and back to profile to update state
+      if (navigateTo) {
+        navigateTo("home")
+        setTimeout(() => {
+          navigateTo("profile")
+        }, 50)
+      }
     }
     
     toast({
