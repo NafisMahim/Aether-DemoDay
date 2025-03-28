@@ -18,10 +18,45 @@ export default function ProfileScreen({ handleBack, username, quizResults, bio, 
   const [editedBio, setEditedBio] = useState(bio)
   const firstLetter = username.charAt(0)
 
-  const personalityType = quizResults?.personalityType || "Take a quiz to discover your type"
-  const description = quizResults?.description || "Your personality analysis will appear here after completing a quiz."
-  const strengths = quizResults?.strengths || []
-  const weaknesses = quizResults?.weaknesses || []
+  // Extract quiz result data with more precise fallbacks
+  const personalityType = quizResults?.primaryType?.name || quizResults?.personalityType || "Take a quiz to discover your type"
+  const description = quizResults?.primaryType?.description || quizResults?.description || "Your personality analysis will appear here after completing a quiz."
+  
+  // Generate strengths and areas to improve from the quiz data
+  const strengths = []
+  const weaknesses = []
+  
+  // Add recommended careers as strengths if they exist
+  if (quizResults?.primaryType?.careers) {
+    strengths.push(...quizResults.primaryType.careers.slice(0, 3).map((career: string) => `Suitable for: ${career}`))
+  }
+  
+  // Add hybrid careers as strengths if they exist
+  if (quizResults?.hybridCareers) {
+    strengths.push(...quizResults.hybridCareers.slice(0, 2).map((career: string) => `Potential path: ${career}`))
+  }
+  
+  // Add secondary dimension as a developmental area
+  if (quizResults?.secondaryType) {
+    weaknesses.push(`Develop ${quizResults.secondaryType.name} skills further`)
+    
+    // Add some secondary careers as areas to develop
+    if (quizResults.secondaryType.careers) {
+      weaknesses.push(...quizResults.secondaryType.careers
+        .slice(0, 2)
+        .map((career: string) => `Consider exploring: ${career}`))
+    }
+  }
+  
+  // Add some generic development areas if we don't have any
+  if (weaknesses.length === 0) {
+    weaknesses.push("Take the assessment to discover areas for growth")
+  }
+  
+  // Add generic strengths if we don't have any
+  if (strengths.length === 0) {
+    strengths.push("Complete the career assessment to reveal your strengths")
+  }
 
   const handleSaveBio = () => {
     setIsEditing(false)

@@ -712,13 +712,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         Recommended careers that combine these dimensions include:
         ${hybridCareers.join(', ')}
         
-        Please provide a detailed career analysis in EXACTLY 2 paragraphs (no more, no less) that:
+        I need you to provide a career analysis that consists of EXACTLY 2 PARAGRAPHS (no more, no less).
+
+        Your response should start with "Paragraph 1:" and end with the last sentence of paragraph 2.
         
-        Paragraph 1: Explain what this combination of career dimensions means for my professional path and how I can leverage these strengths in today's job market.
+        Paragraph 1 MUST explain what this combination of career dimensions means for my professional path and how I can leverage these strengths in today's job market.
         
-        Paragraph 2: Suggest specific steps I can take to develop these career dimensions further, including potential education paths or skill development opportunities.
+        Paragraph 2 MUST suggest specific steps I can take to develop these career dimensions further, including potential education paths or skill development opportunities.
         
-        Write in a professional but encouraging tone. Each paragraph should be concise but informative.
+        Each paragraph should be concise (3-4 sentences each) and informative. Use a professional but encouraging tone.
+        
+        DO NOT add extra spacing between paragraphs. DO NOT add an introduction or conclusion.
+        DO NOT number the paragraphs or make bullet points. Write continuous prose in exactly 2 paragraphs.
       `;
       
       // Configure generation parameters
@@ -734,7 +739,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       const response = await result.response;
-      const analysis = response.text();
+      let analysis = response.text();
+      
+      // Post-process the AI response to ensure exactly 2 paragraphs
+      analysis = analysis.trim();
+      
+      // Remove any labels like "Paragraph 1:" at the beginning
+      analysis = analysis.replace(/^Paragraph \d+:\s*/i, '');
+      
+      // Split by paragraphs using double newlines
+      const paragraphs = analysis.split(/\n\s*\n/);
+      
+      // If we have more than 2 paragraphs, keep only the first two
+      if (paragraphs.length > 2) {
+        analysis = paragraphs.slice(0, 2).join('\n\n');
+      } 
+      // If we have just one paragraph, keep it as is (can't force AI to write 2)
+      else if (paragraphs.length === 1) {
+        analysis = paragraphs[0];
+      }
+      // If we have exactly 2, rejoin them properly
+      else {
+        analysis = paragraphs.join('\n\n');
+      }
+      
+      // Clean up any remaining issues
+      analysis = analysis.replace(/Paragraph \d+:\s*/gi, '');
       
       return res.status(200).json({ analysis });
     } catch (error) {
