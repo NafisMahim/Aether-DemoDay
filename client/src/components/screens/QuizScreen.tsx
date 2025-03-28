@@ -168,10 +168,19 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
       
       const careerData = generateCareerData()
       
-      const response = await apiRequest('POST', '/api/career-analysis', { careerData })
-      const data = await response.json()
+      // First get detailed analysis
+      const analysisResponse = await apiRequest('POST', '/api/career-analysis', { careerData })
+      const analysisData = await analysisResponse.json()
       
-      setAiAnalysis(data.analysis)
+      // Then get summary 
+      const summaryResponse = await apiRequest('POST', '/api/career-summary', { careerData })
+      const summaryData = await summaryResponse.json()
+      
+      // Combine both analyses
+      const fullAnalysis = analysisData.analysis + "\n\n" + summaryData.analysis
+      
+      // Use the combined analysis
+      setAiAnalysis(fullAnalysis)
     } catch (error) {
       console.error('Error fetching AI career analysis:', error)
       setAiError('Unable to generate AI career analysis. Please try again later.')

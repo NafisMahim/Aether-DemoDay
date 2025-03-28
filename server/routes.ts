@@ -6,15 +6,24 @@ import passport from "passport";
 import session from "express-session";
 import { configurePassport, hashPassword } from "./auth";
 import MemoryStore from "memorystore";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, type types } from "@google/generative-ai";
 
 // Initialize Gemini AI
 const geminiApiKey = process.env.GEMINI_API_KEY;
-let genAI: any = null;
+let genAI: GoogleGenerativeAI | null = null;
 
 if (geminiApiKey) {
-  genAI = new GoogleGenerativeAI(geminiApiKey);
-  console.log("Gemini AI initialized successfully");
+  try {
+    genAI = new GoogleGenerativeAI(geminiApiKey);
+    console.log("Gemini AI initialized successfully with API key");
+    
+    // Test model creation to verify API key works
+    const testModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    console.log("Successfully created Gemini model instance:", testModel !== undefined);
+  } catch (error) {
+    console.error("Error initializing Gemini AI:", error);
+    genAI = null;
+  }
 } else {
   console.warn("GEMINI_API_KEY not set. AI features will not be available.");
 }
@@ -505,8 +514,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // ---------- AI CAREER ANALYSIS ----------
   
-  // Generate career analysis with Gemini AI
-  app.post('/api/career-analysis', async (req, res) => {
+  // Generate career summary analysis with Gemini AI
+  app.post('/api/career-summary', async (req, res) => {
     try {
       if (!genAI) {
         return res.status(503).json({ 
@@ -522,7 +531,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log('Generating career analysis with Gemini AI...');
       
-      const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
+      // Get a Gemini model instance
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
       
       // Format the prompt with the career data
       const prompt = `
@@ -552,7 +562,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         Second paragraph: Provide forward-looking advice about how to leverage these strengths, potential development areas, and unexplored career paths that might be especially fulfilling given this particular combination of traits. Make it personalized and actionable.
       `;
       
-      const result = await model.generateContent(prompt);
+      // Configure generation parameters
+      const generationConfig = {
+        temperature: 1.0,
+        maxOutputTokens: 2000,
+      };
+      
+      // Generate content
+      const result = await model.generateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig,
+      });
+      
       const response = await result.response;
       const text = response.text();
       
@@ -629,7 +650,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Career data is required' });
       }
       
-      const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
+      // Get a Gemini model instance
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
       
       // Create a prompt based on career data
       const primaryType = careerData.primaryType;
@@ -657,8 +679,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         Write in a professional but encouraging tone and format the response with proper paragraphs for readability.
       `;
       
-      // Generate the analysis
-      const result = await model.generateContent(prompt);
+      // Configure generation parameters
+      const generationConfig = {
+        temperature: 1.0,
+        maxOutputTokens: 2000,
+      };
+      
+      // Generate content
+      const result = await model.generateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig,
+      });
+      
       const response = await result.response;
       const analysis = response.text();
       
