@@ -292,7 +292,7 @@ export default function AetherApp() {
           ) : currentScreen === "locations" ? (
             <LocationsScreen handleBack={handleBack} />
           ) : currentScreen === "profile" ? (
-            <ProfileScreen handleBack={handleBack} username={userData.name} quizResults={quizResults} bio={userData.bio} />
+            <ProfileScreen handleBack={handleBack} username={userData.name} quizResults={quizResults} bio={userData.bio} onLogout={handleLogout} />
           ) : currentScreen === "notifications" ? (
             <NotificationsScreen handleBack={handleBack} />
           ) : currentScreen === "messages" ? (

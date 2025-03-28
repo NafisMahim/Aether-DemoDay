@@ -9,9 +9,10 @@ interface ProfileScreenProps {
   username: string
   quizResults: any
   bio: string
+  onLogout?: () => Promise<void>
 }
 
-export default function ProfileScreen({ handleBack, username, quizResults, bio }: ProfileScreenProps) {
+export default function ProfileScreen({ handleBack, username, quizResults, bio, onLogout }: ProfileScreenProps) {
   const { toast } = useToast()
   const [isEditing, setIsEditing] = useState(false)
   const [editedBio, setEditedBio] = useState(bio)
@@ -193,15 +194,33 @@ export default function ProfileScreen({ handleBack, username, quizResults, bio }
             
             <button 
               className="w-full flex items-center justify-between p-4 hover:bg-gray-50 text-red-500"
-              onClick={() => {
-                toast({
-                  title: "Logged out",
-                  description: "You have been logged out successfully."
-                })
-                // In a real app, this would handle the logout process
-                setTimeout(() => {
-                  handleBack()
-                }, 1000)
+              onClick={async () => {
+                if (onLogout) {
+                  // Call the real logout function if available
+                  try {
+                    await onLogout();
+                    toast({
+                      title: "Logged out",
+                      description: "You have been logged out successfully."
+                    });
+                  } catch (error) {
+                    toast({
+                      title: "Logout failed",
+                      description: "There was an error logging out. Please try again.",
+                      variant: "destructive"
+                    });
+                  }
+                } else {
+                  // Fallback for when no logout function is provided
+                  toast({
+                    title: "Logged out",
+                    description: "You have been logged out successfully."
+                  });
+                  // In a real app, this would handle the logout process
+                  setTimeout(() => {
+                    handleBack();
+                  }, 1000);
+                }
               }}
             >
               <div className="flex items-center">
