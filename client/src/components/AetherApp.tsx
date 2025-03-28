@@ -184,8 +184,15 @@ export default function AetherApp() {
     setCurrentScreen(page as any)
   }
 
-  // Handle social login
+  // Handle social login or signup navigation
   const handleSocialLogin = (provider: string) => {
+    // Special case for signup link
+    if (provider === "signup") {
+      setCurrentScreen("signup")
+      setErrorMessage("")
+      return
+    }
+    
     toast({
       title: `${provider} login`,
       description: `Redirecting to ${provider} login...`,
