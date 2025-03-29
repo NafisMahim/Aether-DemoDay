@@ -100,38 +100,61 @@ export default function ProfileScreen({
     ? quizResults.primaryType.description 
     : "Your personality analysis will appear here after completing a quiz."
   
-  // Generate strengths and areas to improve ONLY if quiz has been completed
-  const strengths: string[] = []
-  const weaknesses: string[] = []
+  // Only define and populate strengths and weaknesses if the user has completed the quiz
+  // This ensures we don't accidentally show defaults for new users
+  let strengths: string[] = [];
+  let weaknesses: string[] = [];
   
-  // Only generate strengths and weaknesses if we have actual quiz results
-  if (hasCompletedQuiz) {
+  // Added extra protection by nesting all strength/weakness generation inside hasCompletedQuiz
+  if (hasCompletedQuiz && quizResults && quizResults.primaryType) {
+    // Only then populate the strength and weakness data
     // Add recommended careers as strengths if they exist
-    if (quizResults.primaryType.careers) {
-      strengths.push(...quizResults.primaryType.careers.slice(0, 3).map((career: string) => `Suitable for: ${career}`))
+    if (quizResults.primaryType.careers && Array.isArray(quizResults.primaryType.careers)) {
+      strengths = [
+        ...strengths,
+        ...quizResults.primaryType.careers.slice(0, 3).map((career: string) => `Suitable for: ${career}`)
+      ];
     }
     
     // Add hybrid careers as strengths if they exist
-    if (quizResults.hybridCareers) {
-      strengths.push(...quizResults.hybridCareers.slice(0, 2).map((career: string) => `Potential path: ${career}`))
+    if (quizResults.hybridCareers && Array.isArray(quizResults.hybridCareers)) {
+      strengths = [
+        ...strengths,
+        ...quizResults.hybridCareers.slice(0, 2).map((career: string) => `Potential path: ${career}`)
+      ];
     }
     
     // Add primary type strengths if explicitly provided
     if (quizResults.strengths && Array.isArray(quizResults.strengths)) {
-      strengths.push(...quizResults.strengths.slice(0, 3))
+      strengths = [
+        ...strengths,
+        ...quizResults.strengths.slice(0, 3)
+      ];
     }
     
     // Add secondary dimension as a developmental area
-    if (quizResults.secondaryType) {
-      weaknesses.push(`Develop ${quizResults.secondaryType.name} skills further`)
+    if (quizResults.secondaryType && quizResults.secondaryType.name) {
+      weaknesses = [
+        ...weaknesses,
+        `Develop ${quizResults.secondaryType.name} skills further`
+      ];
       
       // Add some secondary careers as areas to develop
-      if (quizResults.secondaryType.careers) {
-        weaknesses.push(...quizResults.secondaryType.careers
-          .slice(0, 2)
-          .map((career: string) => `Consider exploring: ${career}`))
+      if (quizResults.secondaryType.careers && Array.isArray(quizResults.secondaryType.careers)) {
+        weaknesses = [
+          ...weaknesses,
+          ...quizResults.secondaryType.careers
+            .slice(0, 2)
+            .map((career: string) => `Consider exploring: ${career}`)
+        ];
       }
     }
+  }
+  
+  // If we have no data at all even after all checks, ensure arrays are empty
+  if (!hasCompletedQuiz) {
+    strengths = [];
+    weaknesses = [];
   }
 
   const handleSaveBio = () => {
