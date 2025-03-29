@@ -274,7 +274,34 @@ export default function InternshipsScreen({ handleBack, quizResults: initialQuiz
           });
         }
         
-        // Process Remotive results (first fallback)
+        // Process Adzuna results (secondary source)
+        if (data.results.adzuna && Array.isArray(data.results.adzuna)) {
+          console.log("Processing Adzuna results:", data.results.adzuna);
+          data.results.adzuna.forEach((result: any) => {
+            if (!result || !result.query) {
+              console.warn("Invalid Adzuna result object:", result);
+              return;
+            }
+            
+            const categoryName = result.query;
+            const categoryJobs = result.jobs || [];
+            
+            console.log(`Processing Adzuna category ${categoryName} with ${categoryJobs.length} jobs`);
+            
+            if (!internshipsByCategory[categoryName]) {
+              internshipsByCategory[categoryName] = [];
+            }
+            
+            internshipsByCategory[categoryName] = [
+              ...internshipsByCategory[categoryName],
+              ...categoryJobs
+            ];
+            
+            allInternships.push(...categoryJobs);
+          });
+        }
+        
+        // Process Remotive results (fallback)
         if (data.results.remotive && Array.isArray(data.results.remotive)) {
           console.log("Processing Remotive results:", data.results.remotive);
           
@@ -348,7 +375,13 @@ export default function InternshipsScreen({ handleBack, quizResults: initialQuiz
           categories: Object.keys(internshipsByCategory),
           totalJobs: allInternships.length,
           rapidApiJobs: allInternships.filter(job => job.id.toString().startsWith('rapidapi-')).length,
-          remotiveJobs: allInternships.filter(job => !job.id.toString().startsWith('rapidapi-') && !job.id.toString().startsWith('google-') && !job.id.toString().startsWith('mock-')).length,
+          adzunaJobs: allInternships.filter(job => job.id.toString().startsWith('adzuna-')).length,
+          remotiveJobs: allInternships.filter(job => 
+            !job.id.toString().startsWith('rapidapi-') && 
+            !job.id.toString().startsWith('adzuna-') && 
+            !job.id.toString().startsWith('google-') && 
+            !job.id.toString().startsWith('mock-')
+          ).length,
           googleJobs: allInternships.filter(job => job.id.toString().startsWith('google-')).length,
           mockJobs: allInternships.filter(job => job.id.toString().startsWith('mock-')).length
         });
@@ -941,7 +974,17 @@ export default function InternshipsScreen({ handleBack, quizResults: initialQuiz
                           RapidAPI
                         </span>
                       )}
+                      {internship.id.toString().startsWith('adzuna-') && (
+                        <span className="bg-orange-50 text-orange-700 text-xs px-2 py-1 rounded-full flex items-center">
+                          <svg className="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M19.5 3a2.5 2.5 0 00-2.5 2.5v13a2.5 2.5 0 005 0v-13A2.5 2.5 0 0019.5 3zm-14 0a2.5 2.5 0 00-2.5 2.5v13a2.5 2.5 0 005 0v-13A2.5 2.5 0 005.5 3z"/>
+                            <path d="M12.5 8a2.5 2.5 0 00-2.5 2.5v8a2.5 2.5 0 005 0v-8A2.5 2.5 0 0012.5 8z"/>
+                          </svg>
+                          Adzuna
+                        </span>
+                      )}
                       {!internship.id.toString().startsWith('rapidapi-') && 
+                       !internship.id.toString().startsWith('adzuna-') &&
                        !internship.id.toString().startsWith('google-') && 
                        !internship.id.toString().startsWith('mock-') && (
                         <span className="bg-green-50 text-green-700 text-xs px-2 py-1 rounded-full flex items-center">

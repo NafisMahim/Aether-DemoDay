@@ -700,7 +700,12 @@ export async function findInternships(
   keywords: string[] = [],
   limit: number = 10,
   isPersonalizedMatch: boolean = false
-): Promise<{ rapidapi?: InternshipSearchResult[], adzuna?: InternshipSearchResult[], remotive: InternshipSearchResult[], google?: any[] }> {
+): Promise<{ 
+  rapidapi?: InternshipSearchResult[], 
+  adzuna?: InternshipSearchResult[], 
+  remotive?: InternshipSearchResult[], 
+  google?: any[] 
+}> {
   try {
     // Log input parameters for debugging
     console.log('Internship search parameters:', {
@@ -757,38 +762,36 @@ export async function findInternships(
       console.log('Will try fallback sources...');
     }
     
-    // If RapidAPI didn't return results, try Adzuna as the first fallback
+    // Always fetch from Adzuna as well (not just as a fallback)
     let adzunaResults: InternshipSearchResult[] = [];
     let hasAdzunaResults = false;
     
-    if (!hasRapidApiResults) {
-      console.log('No results from RapidAPI, falling back to Adzuna API...');
+    // Always try Adzuna in parallel with RapidAPI
+    try {
+      console.log('Searching internships using secondary source: Adzuna API');
+      adzunaResults = await searchAdzunaInternships(limitedTerms, limit);
       
-      try {
-        adzunaResults = await searchAdzunaInternships(limitedTerms, limit);
-        
-        hasAdzunaResults = adzunaResults.some(result => 
-          result.source === 'adzuna' && result.jobs && result.jobs.length > 0
-        );
-        
-        console.log('Adzuna internship search complete. Success:', hasAdzunaResults);
-        console.log('Adzuna results breakdown:', adzunaResults.map(r => ({
-          source: r.source,
-          query: r.query,
-          jobCount: r.jobs?.length || 0
-        })));
-      } catch (adzunaError) {
-        console.error('Error with Adzuna internship search:', adzunaError);
-        console.log('Will try next fallback source...');
-      }
+      hasAdzunaResults = adzunaResults.some(result => 
+        result.source === 'adzuna' && result.jobs && result.jobs.length > 0
+      );
+      
+      console.log('Adzuna internship search complete. Success:', hasAdzunaResults);
+      console.log('Adzuna results breakdown:', adzunaResults.map(r => ({
+        source: r.source,
+        query: r.query,
+        jobCount: r.jobs?.length || 0
+      })));
+    } catch (adzunaError) {
+      console.error('Error with Adzuna internship search:', adzunaError);
+      console.log('Will try next fallback source if needed...');
     }
     
-    // If neither RapidAPI nor Adzuna returned results, try Remotive as second fallback
+    // Only use Remotive as a fallback if the primary sources (RapidAPI and Adzuna) fail
     let remotiveResults: InternshipSearchResult[] = [];
     let hasRealRemotiveResults = false;
     
     if (!hasRapidApiResults && !hasAdzunaResults) {
-      console.log('No results from RapidAPI or Adzuna, falling back to Remotive...');
+      console.log('No results from primary sources (RapidAPI and Adzuna), falling back to Remotive...');
       
       remotiveResults = await searchRemotiveInternships(limitedTerms, limit);
       
@@ -802,9 +805,6 @@ export async function findInternships(
         query: r.query,
         jobCount: r.jobs?.length || 0
       })));
-    } else if (!hasRapidApiResults) {
-      // Still get Remotive results as a backup even if Adzuna worked
-      remotiveResults = await searchRemotiveInternships(limitedTerms, limit);
     }
     
     // If none of the primary APIs returned real results, try Google as final fallback
@@ -835,16 +835,25 @@ export async function findInternships(
     console.log(`- Google: ${googleJobCount} jobs`);
     console.log(`- Total: ${rapidApiJobCount + adzunaJobCount + remotiveJobCount + googleJobCount} jobs`);
     
+    // Return all data sources that have results, regardless of success
+    // This allows showing results from all sources simultaneously
     return {
       ...(hasRapidApiResults ? { rapidapi: rapidApiResults } : {}),
       ...(hasAdzunaResults ? { adzuna: adzunaResults } : {}),
-      remotive: remotiveResults,
+      ...(hasRealRemotiveResults ? { remotive: remotiveResults } : {}),
       ...(googleResults ? { google: googleResults } : {})
     };
   } catch (error) {
     console.error('Error finding internships:', error);
+    // Even in the error case, return an empty object with the right structure
     return {
-      remotive: []
+      rapidapi: [],
+      adzuna: []
+    } as { 
+      rapidapi?: InternshipSearchResult[], 
+      adzuna?: InternshipSearchResult[], 
+      remotive?: InternshipSearchResult[], 
+      google?: any[] 
     };
   }
 }
