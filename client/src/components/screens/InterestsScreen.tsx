@@ -216,37 +216,37 @@ export default function InterestsScreen({ handleBack, interests, setUserData, na
         </div>
       </div>
       
-      {/* Quiz Completion Dialog */}
+      {/* Quiz Completion Dialog - REVERTED TO ORIGINAL DESIGN */}
       <Dialog open={showQuizPrompt} onOpenChange={setShowQuizPrompt}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Career Assessment Required</DialogTitle>
-            <DialogDescription>
-              To provide personalized internship recommendations, you need to complete the career assessment quiz first.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col space-y-2 py-4">
-            <p className="text-sm text-gray-600">
-              The internship finder uses your career assessment results to match you with relevant opportunities based on your personality type, strengths, and interests.
-            </p>
+        <DialogContent className="p-0 bg-white rounded-2xl shadow-lg overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-4 text-white">
+            <h3 className="text-xl font-bold">Complete Career Quiz First</h3>
           </div>
-          <DialogFooter className="sm:justify-between">
-            <Button
-              variant="outline"
-              onClick={() => setShowQuizPrompt(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                setShowQuizPrompt(false)
-                navigateTo("quiz")
-              }}
-              className="bg-blue-500 hover:bg-blue-600"
-            >
-              Take the Quiz Now
-            </Button>
-          </DialogFooter>
+          
+          <div className="p-4">
+            <p className="text-sm text-gray-600 mb-4">
+              To find internships that match your skills and interests, please complete the career assessment quiz.
+            </p>
+            
+            <div className="flex justify-end space-x-2">
+              <Button 
+                variant="outline" 
+                className="text-gray-700 rounded-xl"
+                onClick={() => setShowQuizPrompt(false)}
+              >
+                Later
+              </Button>
+              <Button 
+                className="bg-blue-500 text-white rounded-xl"
+                onClick={() => {
+                  setShowQuizPrompt(false)
+                  navigateTo("quiz")
+                }}
+              >
+                Take Quiz
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
