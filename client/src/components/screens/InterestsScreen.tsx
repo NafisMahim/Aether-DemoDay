@@ -35,18 +35,59 @@ export default function InterestsScreen({ handleBack, interests, setUserData, na
   const [userInterests, setUserInterests] = useState<Interest[]>(interests)
   const [isQuizCompleted, setIsQuizCompleted] = useState(false)
   const [showQuizPrompt, setShowQuizPrompt] = useState(false)
+  const [isCheckingQuizStatus, setIsCheckingQuizStatus] = useState(true)
   
   // Check if the quiz has been completed
   useEffect(() => {
-    // Check for query params to see if we were redirected from another page
-    const path = window.location.pathname
-    const searchParams = new URLSearchParams(window.location.search)
-    const fromQuiz = searchParams.get('fromQuiz') === 'true'
+    const checkQuizCompletion = async () => {
+      setIsCheckingQuizStatus(true)
+      
+      try {
+        // First check sessionStorage (quick check)
+        const sessionQuizCompleted = sessionStorage.getItem('quizCompleted') === 'true'
+        
+        if (sessionQuizCompleted) {
+          setIsQuizCompleted(true)
+          setIsCheckingQuizStatus(false)
+          return
+        }
+        
+        // Check URL parameters
+        const searchParams = new URLSearchParams(window.location.search)
+        const fromQuiz = searchParams.get('fromQuiz') === 'true'
+        
+        if (fromQuiz) {
+          setIsQuizCompleted(true)
+          setIsCheckingQuizStatus(false)
+          return
+        }
+        
+        // Then check the user's profile from the server
+        const authStatusResponse = await fetch('/api/auth/status')
+        const authData = await authStatusResponse.json()
+        
+        if (authData.isAuthenticated && authData.user) {
+          // Check if user has quiz results in their profile
+          const hasQuizResults = authData.user.quizResults && 
+            (authData.user.quizResults.primaryType || 
+             authData.user.quizResults.personalityType ||
+             authData.user.quizResults.categories?.length > 0)
+          
+          if (hasQuizResults) {
+            console.log("Quiz completed status found in user profile")
+            // Update sessionStorage for future quick checks
+            sessionStorage.setItem('quizCompleted', 'true')
+            setIsQuizCompleted(true)
+          }
+        }
+      } catch (error) {
+        console.error("Error checking quiz completion status:", error)
+      } finally {
+        setIsCheckingQuizStatus(false)
+      }
+    }
     
-    // Check from sessionStorage if quiz was completed
-    const quizCompleted = sessionStorage.getItem('quizCompleted') === 'true'
-    
-    setIsQuizCompleted(fromQuiz || quizCompleted)
+    checkQuizCompletion()
   }, [])
 
   const handleAddInterest = () => {

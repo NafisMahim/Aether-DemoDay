@@ -83,11 +83,25 @@ export default function AetherApp() {
         
         if (data.isAuthenticated && data.user) {
           setUser(data.user)
+          
+          // If the user has quiz results in their profile, set them
+          if (data.user.quizResults) {
+            console.log("Setting quiz results from user data");
+            setQuizResults(data.user.quizResults);
+            
+            // Store quiz completion in sessionStorage for quick access
+            try {
+              sessionStorage.setItem('quizCompleted', 'true');
+            } catch (storageError) {
+              console.error('Error storing quiz completion status:', storageError);
+            }
+          }
+          
           setUserData({
             name: data.user.displayName || data.user.username,
             bio: data.user.bio || "Exploring new opportunities and personal growth!",
             profileImage: data.user.profileImage || "",
-            interests: userData.interests // Keep default interests for now
+            interests: data.user.interests || userData.interests // Use user interests if available
           })
           setCurrentScreen("home")
         }
@@ -112,10 +126,26 @@ export default function AetherApp() {
         setUser(data.user)
         setCurrentScreen("home")
         setErrorMessage("")
+        
+        // If the user has quiz results in their profile, set them
+        if (data.user.quizResults) {
+          console.log("Setting quiz results from login response");
+          setQuizResults(data.user.quizResults);
+          
+          // Store quiz completion in sessionStorage for quick access
+          try {
+            sessionStorage.setItem('quizCompleted', 'true');
+          } catch (storageError) {
+            console.error('Error storing quiz completion status:', storageError);
+          }
+        }
+        
         setUserData({
           ...userData, 
           name: data.user.displayName || data.user.username,
-          profileImage: data.user.profileImage || ""
+          profileImage: data.user.profileImage || "",
+          bio: data.user.bio || userData.bio,
+          interests: data.user.interests || userData.interests
         })
         toast({
           title: "Login successful",
@@ -144,10 +174,26 @@ export default function AetherApp() {
         setUser(data.user)
         setCurrentScreen("home")
         setErrorMessage("")
+        
+        // If the user has quiz results in their profile, set them
+        if (data.user.quizResults) {
+          console.log("Setting quiz results from signup response");
+          setQuizResults(data.user.quizResults);
+          
+          // Store quiz completion in sessionStorage for quick access
+          try {
+            sessionStorage.setItem('quizCompleted', 'true');
+          } catch (storageError) {
+            console.error('Error storing quiz completion status:', storageError);
+          }
+        }
+        
         setUserData({
           ...userData,
           name: data.user.displayName || data.user.username,
-          profileImage: data.user.profileImage || ""
+          profileImage: data.user.profileImage || "",
+          bio: data.user.bio || userData.bio,
+          interests: data.user.interests || userData.interests
         })
         toast({
           title: "Account created",
@@ -239,8 +285,20 @@ export default function AetherApp() {
       const response = await apiRequest("POST", "/api/logout")
       const data = await response.json()
       
+      // Clear user state
       setUser(null)
       setCurrentScreen("login")
+      
+      // Clear quiz results
+      setQuizResults(null)
+      
+      // Clear quiz completion from sessionStorage
+      try {
+        sessionStorage.removeItem('quizCompleted');
+      } catch (storageError) {
+        console.error('Error clearing quiz completion status:', storageError);
+      }
+      
       toast({
         title: "Logged out",
         description: "You have been successfully logged out.",

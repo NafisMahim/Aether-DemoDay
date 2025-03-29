@@ -330,6 +330,41 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
   
   const [showIncompleteProfileBanner, setShowIncompleteProfileBanner] = useState(false);
   
+  // Check if user has quiz results in their profile
+  useEffect(() => {
+    const checkUserQuizResults = async () => {
+      try {
+        // First check if we already have quiz results passed in props
+        if (quizResults && (quizResults.primaryType || quizResults.dominantType)) {
+          // We have quiz results, no need to show incomplete profile banner
+          return;
+        }
+        
+        // Otherwise fetch from server
+        const authStatusResponse = await fetch('/api/auth/status');
+        const authData = await authStatusResponse.json();
+        
+        if (authData.isAuthenticated && authData.user) {
+          if (authData.user.quizResults &&
+              (authData.user.quizResults.primaryType || 
+               authData.user.quizResults.personalityType || 
+               authData.user.quizResults.dominantType)) {
+            console.log("Quiz results found in user profile");
+            // If we found quiz results in the user profile, don't show the banner
+            return;
+          } else {
+            // No quiz results in user profile, show banner
+            setShowIncompleteProfileBanner(true);
+          }
+        }
+      } catch (error) {
+        console.error("Error checking user quiz results:", error);
+      }
+    };
+    
+    checkUserQuizResults();
+  }, [quizResults]);
+  
   // Handle AI match button click with Gemini AI
   const handleAIMatch = async () => {
     try {
