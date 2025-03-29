@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { sanitizeForApi } from "@/utils/jsonUtils";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -7,15 +8,22 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+/**
+ * Makes an API request with the provided method, URL, and data.
+ * Automatically sanitizes the data to prevent circular reference issues.
+ */
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  // Sanitize the data to remove circular references and non-serializable values
+  const safeData = data ? sanitizeForApi(data) : undefined;
+  
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
+    headers: safeData ? { "Content-Type": "application/json" } : {},
+    body: safeData ? JSON.stringify(safeData) : undefined,
     credentials: "include",
   });
 

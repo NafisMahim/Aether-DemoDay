@@ -252,17 +252,13 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
       setIsSearching(true);
       setError(null);
       
-      // Call the API to search for internships by keyword
-      // Create a safe search query object
+      // API request now automatically sanitizes data in queryClient.ts
       const searchData = {
         searchQuery: searchQuery.trim(),
         limit: 20
       };
       
-      // Use JSON.stringify/parse to ensure no circular references
-      const safeSearchData = JSON.parse(JSON.stringify(searchData));
-      
-      const response = await apiRequest('POST', '/api/internships/search', safeSearchData);
+      const response = await apiRequest('POST', '/api/internships/search', searchData);
       
       const data = await response.json();
       
@@ -363,13 +359,10 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
         personalityType: primaryType
       };
       
-      // Call the new AI-powered match endpoint
-      // Clone and sanitize quiz results to prevent circular structure
-      const sanitizedQuizResults = quizResults ? JSON.parse(JSON.stringify(quizResults)) : null;
-      
+      // API request now automatically sanitizes data in queryClient.ts
       const response = await apiRequest('POST', '/api/internships/match', {
         userProfile,
-        quizResults: sanitizedQuizResults,
+        quizResults, // No need to manually sanitize - handled by apiRequest
         jobTitles: [],
         keywords: [],
         limit: 20

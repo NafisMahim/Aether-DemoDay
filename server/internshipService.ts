@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
+import { sanitizeForJson } from './utils/jsonUtils';
 
 /**
  * Fetch internships from RapidAPI Internships API
@@ -517,32 +518,32 @@ export async function generateInternshipRecommendations(
       
       console.log('Successfully generated internship recommendations with Gemini AI');
       
-      return {
+      return sanitizeForJson({
         recommendations: parsed.recommendations || "No specific recommendations found.",
         topMatches: parsed.topMatches || [],
         matchScores: parsed.matchScores || {}
-      };
+      });
     } catch (parseError) {
       console.error('Error parsing Gemini AI response:', parseError);
       console.log('Raw response:', text);
       
       // Return a fallback response
-      return {
+      return sanitizeForJson({
         recommendations: "Unable to generate specific recommendations at this time.",
         topMatches: allInternshipTitles.slice(0, 3),
         matchScores: allInternshipTitles.slice(0, 5).reduce((acc, title) => {
           acc[title] = Math.floor(Math.random() * 30) + 70; // Random match score between 70-100
           return acc;
         }, {} as Record<string, number>)
-      };
+      });
     }
   } catch (error) {
     console.error('Error generating internship recommendations:', error);
-    return {
+    return sanitizeForJson({
       recommendations: "An error occurred while generating recommendations.",
       topMatches: [],
       matchScores: {}
-    };
+    });
   }
 }
 
@@ -638,15 +639,15 @@ export async function findInternships(
     console.log(`- Google: ${googleJobCount} jobs`);
     console.log(`- Total: ${rapidApiJobCount + remotiveJobCount + googleJobCount} jobs`);
     
-    return {
+    return sanitizeForJson({
       ...(hasRapidApiResults ? { rapidapi: rapidApiResults } : {}),
       remotive: remotiveResults,
       ...(googleResults ? { google: googleResults } : {})
-    };
+    });
   } catch (error) {
     console.error('Error finding internships:', error);
-    return {
+    return sanitizeForJson({
       remotive: []
-    };
+    });
   }
 }
