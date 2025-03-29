@@ -953,6 +953,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Get user quiz results - used for persistence across sessions
+  app.get('/api/user/quiz-results', async (req, res) => {
+    try {
+      // If user is authenticated, get their quiz results
+      if (req.isAuthenticated() && req.user) {
+        const userId = req.user.id;
+        const user = await storage.getUser(userId);
+        
+        if (!user) {
+          console.error('User not found when retrieving quiz results for ID:', userId);
+          return res.status(404).json({ error: 'User not found' });
+        }
+        
+        if (!user.quizResults) {
+          console.log('No quiz results found for user:', userId);
+          return res.status(404).json({ error: 'Quiz results not found' });
+        }
+        
+        console.log('Retrieved quiz results for user:', userId);
+        return res.status(200).json({ results: user.quizResults });
+      }
+      
+      // For non-authenticated users, just let them know if they have a quiz in progress
+      // from the current session (used for UI state management, not for actual results)
+      return res.status(200).json({ 
+        completed: false,
+        message: 'Please log in to access your quiz results'
+      });
+    } catch (error) {
+      console.error('Error retrieving quiz results:', error);
+      res.status(500).json({ 
+        error: 'Failed to retrieve quiz results',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+  
   // Generate career analysis using Gemini AI
   app.post('/api/career-analysis', async (req, res) => {
     try {

@@ -313,6 +313,7 @@ export default function AetherApp() {
                 })
               }}
               navigateTo={navigateTo}
+              quizResults={quizResults}
             />
           ) : currentScreen === "experience" ? (
             <ExperienceScreen handleBack={handleBack} />
