@@ -141,6 +141,11 @@ export function matchQuizResultsToCategories(quizResults: any): string[] {
  * @returns Object containing jobTitles and keywords arrays
  */
 export function getJobSearchTerms(categories: string[]): {jobTitles: string[], keywords: string[]} {
+  // If no categories, return empty arrays
+  if (!categories || categories.length === 0) {
+    return { jobTitles: [], keywords: [] };
+  }
+  
   const jobTitles: Set<string> = new Set();
   const keywords: Set<string> = new Set();
   
@@ -162,10 +167,13 @@ export function getJobSearchTerms(categories: string[]): {jobTitles: string[], k
     }
   });
   
-  // Always include "intern" and "internship" in keywords
-  keywords.add("intern");
-  keywords.add("internship");
-  keywords.add("entry level");
+  // Only add default keywords if we have at least one category match
+  if (jobTitles.size > 0 || keywords.size > 0) {
+    // Always include "intern" and "internship" in keywords
+    keywords.add("intern");
+    keywords.add("internship");
+    keywords.add("entry level");
+  }
   
   // Limit to reasonable number to avoid overwhelming the API
   const limitedJobTitles = Array.from(jobTitles).slice(0, 5);

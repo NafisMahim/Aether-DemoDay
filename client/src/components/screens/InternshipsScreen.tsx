@@ -53,7 +53,11 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
         })
         
         if (matchedCategories.length === 0) {
-          setError("Unable to determine career categories from your profile. Please complete the career quiz or add more interests.")
+          // Show a clearer error message instructing the user to complete the quiz first
+          setError("Please complete the career quiz to see personalized internship recommendations. Your quiz results are used to match you with relevant career categories.")
+          setCareerCategories([])
+          setInternships([])
+          setCategoryJobs({})
           setIsLoading(false)
           return
         }

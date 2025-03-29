@@ -558,9 +558,9 @@ export async function findInternships(
     combinedTerms.forEach(term => searchTermsSet.add(term));
     const searchTerms = Array.from(searchTermsSet);
     
-    // If no search terms, use some defaults
+    // Don't use defaults - if no search terms, the client should handle this
     if (searchTerms.length === 0) {
-      searchTerms.push("Software Engineer", "Marketing", "Data Analyst", "Business Analyst");
+      return { rapidapi: [], remotive: [], google: [] };
     }
     
     // Limit to reasonable number of terms
