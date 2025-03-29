@@ -63,10 +63,11 @@ export default function ChatbotScreen({ handleBack }: ChatbotScreenProps) {
 
     try {
       // Call the backend API to get AI response
+      // Convert 'assistant' role to 'model' for Gemini compatibility
       const response = await apiRequest("POST", "/api/chat", {
         message: input,
         history: messages.map((msg) => ({
-          role: msg.role,
+          role: msg.role === 'assistant' ? 'model' : msg.role,
           content: msg.content,
         })),
       });

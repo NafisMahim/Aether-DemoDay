@@ -1201,10 +1201,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
       
       // Format the chat history for Gemini
-      const formattedHistory = history ? history.slice(0, -1).map((msg: any) => ({
-        role: msg.role === 'user' ? 'user' : 'model',
-        parts: [{ text: msg.content }]
-      })) : [];
+      // Filter history to ensure first message is from user
+      // If no user message exists in history, don't use history at all
+      let formattedHistory: any[] = [];
+      
+      if (history && history.length > 0) {
+        // Find the first user message in history
+        const firstUserMsgIndex = history.findIndex((msg: any) => msg.role === 'user');
+        
+        if (firstUserMsgIndex !== -1) {
+          // Only include messages from the first user message onwards
+          formattedHistory = history.slice(firstUserMsgIndex).map((msg: any) => ({
+            role: msg.role === 'user' ? 'user' : 'model',
+            parts: [{ text: msg.content }]
+          }));
+        }
+      }
       
       // Create a chat session
       const chat = model.startChat({
@@ -1224,6 +1236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true,
         response: text
       });
+      
     } catch (error) {
       console.error('A1 Chatbot error:', error);
       return res.status(500).json({
