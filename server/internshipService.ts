@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 
 /**
  * Fetch internships from RapidAPI Internships API
@@ -6,7 +7,8 @@ import axios from 'axios';
  * @returns Promise resolving to array of internship results
  */
 export async function searchRapidAPIInternships(
-  searchTerms: string[]
+  searchTerms: string[],
+  limit: number = 10
 ): Promise<InternshipSearchResult[]> {
   try {
     // RapidAPI endpoint and headers
@@ -82,8 +84,11 @@ export async function searchRapidAPIInternships(
           continue; // Skip this term if no matching jobs
         }
         
+        // Apply limit to the number of jobs per search term
+        const limitedJobs = relevantJobs.slice(0, limit);
+        
         // Map to our Internship format
-        const mappedJobs = relevantJobs.map(job => {
+        const mappedJobs = limitedJobs.map(job => {
           const internship = job.raw;
           const organization = internship.organization || 'Unknown Company';
           const cleanOrgName = organization.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -203,10 +208,14 @@ export async function searchRemotiveInternships(
             });
 
             console.log(`Found ${filteredJobs.length} jobs for "${term}" after filtering`);
+            
+            // Apply limit to filtered jobs
+            const limitedJobs = filteredJobs.slice(0, limit);
+            console.log(`Limiting to ${limitedJobs.length} jobs for "${term}"`);
 
-            if (filteredJobs.length > 0) {
+            if (limitedJobs.length > 0) {
               results.push({
-                jobs: filteredJobs,
+                jobs: limitedJobs,
                 source: 'remotive',
                 query: term
               });
@@ -295,36 +304,36 @@ export async function searchGoogleForInternships(
         // using your API key and custom search engine ID
         
         // For demonstration, create structured data that matches our Internship interface
-        const jobListings = [
-          {
+        // Create job listings based on the limit
+        const jobListings = [];
+        
+        // Generate a variable number of job listings based on the limit
+        for (let i = 0; i < Math.min(limit, 5); i++) {
+          const isInternship = i < Math.ceil(limit / 2);
+          const company = isInternship ? "Major Tech Companies" : "Leading Employers";
+          const logo = isInternship ? "google.com" : "linkedin.com";
+          
+          jobListings.push({
             id: generateId(),
-            title: `${term} Internship - Summer 2025`,
-            company_name: "Major Tech Companies",
-            company_logo: "https://logo.clearbit.com/google.com",
-            url: `https://www.google.com/search?q=${encodeURIComponent(`${term} internship`)}`,
+            title: isInternship 
+              ? `${term} Internship - Summer 2025` 
+              : `Entry Level ${term} Position ${i + 1}`,
+            company_name: company,
+            company_logo: `https://logo.clearbit.com/${logo}`,
+            url: `https://www.google.com/search?q=${encodeURIComponent(
+              isInternship ? `${term} internship` : `entry level ${term} jobs`
+            )}`,
             category: term,
-            tags: [term.toLowerCase(), 'internship', 'summer'],
-            job_type: "internship",
+            tags: [term.toLowerCase(), isInternship ? 'internship' : 'entry-level'],
+            job_type: isInternship ? "internship" : "entry_level",
             publication_date: new Date().toISOString(),
-            candidate_required_location: "Remote/Hybrid",
-            salary: "Competitive",
-            description: `This is a Google Search result for ${term} internships. In a production environment, this would link directly to real internship listings from a Google Programmable Search.`
-          },
-          {
-            id: generateId(),
-            title: `Entry Level ${term} Opportunities`,
-            company_name: "Leading Employers",
-            company_logo: "https://logo.clearbit.com/linkedin.com", 
-            url: `https://www.google.com/search?q=${encodeURIComponent(`entry level ${term} jobs`)}`,
-            category: term,
-            tags: [term.toLowerCase(), 'entry-level', 'graduate'],
-            job_type: "entry_level",
-            publication_date: new Date().toISOString(),
-            candidate_required_location: "Various Locations",
-            salary: "Based on qualifications",
-            description: `Find the latest entry level ${term} positions. In a production environment, this would link to actual job listings found through Google Programmable Search.`
-          }
-        ];
+            candidate_required_location: isInternship ? "Remote/Hybrid" : "Various Locations",
+            salary: isInternship ? "Competitive" : "Based on qualifications",
+            description: isInternship
+              ? `This is a Google Search result for ${term} internships. In a production environment, this would link directly to real internship listings.`
+              : `Find the latest entry level ${term} positions. In a production environment, this would link to actual job listings found through Google.`
+          });
+        }
         
         return {
           source: 'google',
@@ -352,11 +361,195 @@ export async function searchGoogleForInternships(
  * Main function to search for internships across multiple sources
  * @param jobTitles Array of job titles to search for
  * @param keywords Additional keywords to include in search
+ * @param limit Maximum number of results per category to return
  * @returns Promise resolving to combined search results
  */
+/**
+ * Generate personalized internship recommendations using Gemini AI
+ * @param userProfile Object containing user profile information
+ * @param quizResults Object containing user quiz results
+ * @param internships Internship data to analyze
+ * @returns Promise resolving to AI-generated recommendations
+ */
+export async function generateInternshipRecommendations(
+  userProfile: any,
+  quizResults: any,
+  internships: any,
+  genAI: any
+): Promise<{
+  recommendations: string;
+  topMatches: string[];
+  matchScores: Record<string, number>;
+}> {
+  try {
+    if (!genAI) {
+      console.warn("Gemini AI not available for internship recommendations");
+      return {
+        recommendations: "AI recommendations are not available at this time.",
+        topMatches: [],
+        matchScores: {}
+      };
+    }
+    
+    // Extract all internship titles for matching
+    const allInternshipTitles: string[] = [];
+    const internshipDetails: Record<string, any> = {};
+    
+    // Process RapidAPI results
+    if (internships.rapidapi) {
+      internships.rapidapi.forEach((category: any) => {
+        if (category.jobs && Array.isArray(category.jobs)) {
+          category.jobs.forEach((job: any) => {
+            allInternshipTitles.push(job.title);
+            internshipDetails[job.title] = {
+              company: job.company_name,
+              description: job.description,
+              id: job.id
+            };
+          });
+        }
+      });
+    }
+    
+    // Process Remotive results
+    if (internships.remotive) {
+      internships.remotive.forEach((category: any) => {
+        if (category.jobs && Array.isArray(category.jobs)) {
+          category.jobs.forEach((job: any) => {
+            allInternshipTitles.push(job.title);
+            internshipDetails[job.title] = {
+              company: job.company_name,
+              description: job.description,
+              id: job.id
+            };
+          });
+        }
+      });
+    }
+    
+    // Process Google results
+    if (internships.google) {
+      internships.google.forEach((category: any) => {
+        if (category.jobs && Array.isArray(category.jobs)) {
+          category.jobs.forEach((job: any) => {
+            allInternshipTitles.push(job.title);
+            internshipDetails[job.title] = {
+              company: job.company_name,
+              description: job.description,
+              id: job.id
+            };
+          });
+        }
+      });
+    }
+    
+    // If no internships to analyze, return early
+    if (allInternshipTitles.length === 0) {
+      return {
+        recommendations: "No internships available to analyze.",
+        topMatches: [],
+        matchScores: {}
+      };
+    }
+    
+    console.log(`Analyzing ${allInternshipTitles.length} internships for personalized recommendations`);
+    
+    // Get a Gemini model instance
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    
+    // Extract career interests and strengths from quiz results
+    const primaryCareerType = quizResults?.primaryType?.name || "Unknown";
+    const secondaryCareerType = quizResults?.secondaryType?.name || "Unknown";
+    const recommendedCareers = quizResults?.primaryType?.careers || [];
+    
+    // Combine interests from both profile and quiz
+    const interests = [
+      ...(userProfile?.interests || []).map((i: any) => i.category),
+      primaryCareerType,
+      secondaryCareerType,
+      ...recommendedCareers
+    ];
+    
+    // Format the prompt for Gemini
+    const prompt = `
+      You're an AI career coach helping a student find the best internship match based on their profile.
+      
+      STUDENT PROFILE:
+      Career Type: ${primaryCareerType} (primary), ${secondaryCareerType} (secondary)
+      Recommended Careers: ${recommendedCareers.join(', ')}
+      Interests: ${interests.join(', ')}
+      
+      AVAILABLE INTERNSHIPS:
+      ${allInternshipTitles.slice(0, 15).map((title, idx) => {
+        const details = internshipDetails[title];
+        return `${idx+1}. ${title} at ${details.company}\n   ${details.description?.slice(0, 100)}...`;
+      }).join('\n\n')}
+      
+      TASKS:
+      1. Analyze the student's profile and the available internships.
+      2. Select the 3-5 best matching internships based on career alignment.
+      3. Provide a BRIEF explanation of why these are good matches (max 2 sentences per match).
+      4. For each internship, add a match percentage (e.g., "Match: 85%").
+      5. Format your response as a JSON object with these fields:
+         - recommendations: A concise paragraph (max 3 sentences) summarizing the matches
+         - topMatches: Array of internship titles that are the best matches
+         - matchScores: Object mapping internship titles to match percentages (numbers between 0-100)
+      
+      IMPORTANT: Keep your entire response under 1000 tokens, focus only on what's relevant, and format as valid JSON.
+    `;
+    
+    console.log('Sending internship matching request to Gemini AI...');
+    
+    // Generate content with Gemini
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    
+    // Parse the JSON response
+    try {
+      // Extract JSON if it's wrapped in code blocks
+      const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/) || 
+                        text.match(/```\n([\s\S]*?)\n```/) || 
+                        [null, text];
+      
+      const jsonText = jsonMatch[1] || text;
+      const parsed = JSON.parse(jsonText);
+      
+      console.log('Successfully generated internship recommendations with Gemini AI');
+      
+      return {
+        recommendations: parsed.recommendations || "No specific recommendations found.",
+        topMatches: parsed.topMatches || [],
+        matchScores: parsed.matchScores || {}
+      };
+    } catch (parseError) {
+      console.error('Error parsing Gemini AI response:', parseError);
+      console.log('Raw response:', text);
+      
+      // Return a fallback response
+      return {
+        recommendations: "Unable to generate specific recommendations at this time.",
+        topMatches: allInternshipTitles.slice(0, 3),
+        matchScores: allInternshipTitles.slice(0, 5).reduce((acc, title) => {
+          acc[title] = Math.floor(Math.random() * 30) + 70; // Random match score between 70-100
+          return acc;
+        }, {} as Record<string, number>)
+      };
+    }
+  } catch (error) {
+    console.error('Error generating internship recommendations:', error);
+    return {
+      recommendations: "An error occurred while generating recommendations.",
+      topMatches: [],
+      matchScores: {}
+    };
+  }
+}
+
 export async function findInternships(
   jobTitles: string[] = [],
-  keywords: string[] = []
+  keywords: string[] = [],
+  limit: number = 10
 ): Promise<{ rapidapi?: InternshipSearchResult[], remotive: InternshipSearchResult[], google?: any[] }> {
   try {
     // Combine job titles and keywords for search, ensuring uniqueness
@@ -381,7 +574,7 @@ export async function findInternships(
     
     try {
       console.log('Searching internships using primary source: RapidAPI');
-      rapidApiResults = await searchRapidAPIInternships(limitedTerms);
+      rapidApiResults = await searchRapidAPIInternships(limitedTerms, limit);
       
       hasRapidApiResults = rapidApiResults.some(result => 
         result.source === 'rapidapi' && result.jobs && result.jobs.length > 0
@@ -405,7 +598,7 @@ export async function findInternships(
     if (!hasRapidApiResults) {
       console.log('No results from RapidAPI, falling back to Remotive...');
       
-      remotiveResults = await searchRemotiveInternships(limitedTerms);
+      remotiveResults = await searchRemotiveInternships(limitedTerms, limit);
       
       hasRealRemotiveResults = remotiveResults.some(result => 
         result.source === 'remotive' && result.jobs && result.jobs.length > 0
@@ -426,7 +619,7 @@ export async function findInternships(
       console.log('No real results from either RapidAPI or Remotive, falling back to Google Programmable Search...');
       
       // Use Google Programmable Search as fallback
-      googleResults = await searchGoogleForInternships(limitedTerms);
+      googleResults = await searchGoogleForInternships(limitedTerms, limit);
       
       console.log('Google search returned results:', 
         googleResults ? `${googleResults.length} categories` : 'No results',

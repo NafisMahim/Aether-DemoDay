@@ -7,7 +7,7 @@ import session from "express-session";
 import { configurePassport, hashPassword } from "./auth";
 import MemoryStore from "memorystore";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { findInternships } from "./internshipService";
+import { findInternships, generateInternshipRecommendations } from "./internshipService";
 
 // Initialize Gemini AI
 const geminiApiKey = process.env.GEMINI_API_KEY;
@@ -79,25 +79,171 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Find internships based on career profile and interests
   // Not requiring authentication to allow preview of feature
-  app.post('/api/internships/search', async (req, res) => {
+  // Support both GET and POST methods for easier testing and frontend integration
+  app.get('/api/internships', async (req, res) => {
     try {
-      const { jobTitles, keywords } = req.body;
+      const { jobTitles, keywords, searchQuery, isPersonalizedMatch, limit } = req.query;
       
-      if (!jobTitles && !keywords) {
+      // Convert query parameters to appropriate types
+      const parsedJobTitles = typeof jobTitles === 'string' ? [jobTitles] : jobTitles as string[] || [];
+      const parsedKeywords = typeof keywords === 'string' ? [keywords] : keywords as string[] || [];
+      const parsedSearchQuery = searchQuery as string;
+      const parsedLimit = limit ? parseInt(limit as string, 10) : 10;
+      
+      // If searchQuery is provided, use it to search directly
+      let results;
+      
+      if (parsedSearchQuery) {
+        console.log('Searching with direct query:', parsedSearchQuery);
+        
+        // When directly searching, we'll use the search query as both a job title and keyword
+        const searchTerms = [parsedSearchQuery];
+        
+        // Search for internships using the provided search query
+        results = await findInternships(
+          searchTerms,
+          searchTerms,
+          parsedLimit
+        );
+      } 
+      // For profile-based or AI personalized matches
+      else if (parsedJobTitles.length > 0 || parsedKeywords.length > 0) {
+        // Log search parameters for debugging
+        console.log('Internship search parameters:', { 
+          jobTitles: parsedJobTitles, 
+          keywords: parsedKeywords,
+          limit: parsedLimit
+        });
+        
+        // Search for internships using the provided terms with our tiered approach
+        results = await findInternships(
+          parsedJobTitles, 
+          parsedKeywords,
+          parsedLimit
+        );
+      } else {
         return res.status(400).json({ 
           success: false,
-          message: 'At least one search parameter (jobTitles or keywords) is required'
+          message: 'At least one search parameter (jobTitles, keywords, or searchQuery) is required'
         });
       }
       
-      // Log search parameters for debugging
-      console.log('Internship search parameters:', { jobTitles, keywords });
+      return res.json({
+        success: true,
+        data: results
+      });
+    } catch (error) {
+      console.error('Error searching for internships:', error);
+      return res.status(500).json({ 
+        success: false,
+        message: 'Error searching for internships'
+      });
+    }
+  });
+  
+  // Match internships with a user's career profile using Gemini AI
+  app.post('/api/internships/match', async (req, res) => {
+    try {
+      // Check if Gemini AI is available
+      if (!genAI) {
+        return res.status(503).json({
+          success: false,
+          message: "AI service is unavailable. Please ensure GEMINI_API_KEY is set in environment variables."
+        });
+      }
       
-      // Search for internships using the provided terms with our tiered approach
-      const results = await findInternships(
-        jobTitles || [], 
-        keywords || []
+      const { userProfile, quizResults, jobTitles, keywords, limit } = req.body;
+      
+      if (!quizResults || !quizResults.primaryType) {
+        return res.status(400).json({
+          success: false,
+          message: "Quiz results are required for AI matching"
+        });
+      }
+      
+      console.log('Starting internship matching with AI...');
+      
+      // First, find internships based on categories from quiz results
+      const careerCategories = quizResults.primaryType.careers || [];
+      const searchTerms = [...(jobTitles || []), ...(keywords || []), ...careerCategories];
+      
+      // Get a reasonable set of search terms to use
+      const uniqueTerms = Array.from(new Set(searchTerms)).slice(0, 5);
+      console.log('Searching for internships matching these career categories:', uniqueTerms);
+      
+      // Find internships matching these categories
+      const internships = await findInternships(
+        uniqueTerms,
+        [],
+        limit || 10
       );
+      
+      // Use Gemini AI to match internships to the user's profile
+      const matchResults = await generateInternshipRecommendations(
+        userProfile,
+        quizResults,
+        internships,
+        genAI
+      );
+      
+      return res.status(200).json({
+        success: true,
+        results: internships,
+        matching: matchResults,
+        searchTerms: uniqueTerms
+      });
+    } catch (error) {
+      console.error('Error matching internships with AI:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to match internships with your profile',
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+  
+  // POST method for the same endpoint to support form submissions
+  app.post('/api/internships/search', async (req, res) => {
+    try {
+      const { jobTitles, keywords, searchQuery, isPersonalizedMatch, limit } = req.body;
+      
+      // If searchQuery is provided, use it to search directly
+      let results;
+      
+      if (searchQuery) {
+        console.log('Searching with direct query:', searchQuery);
+        
+        // When directly searching, we'll use the search query as both a job title and keyword
+        const searchTerms = [searchQuery];
+        
+        // Search for internships using the provided search query
+        results = await findInternships(
+          searchTerms,
+          searchTerms,
+          limit || 10
+        );
+      } 
+      // For profile-based or AI personalized matches
+      else if (jobTitles || keywords) {
+        // Log search parameters for debugging
+        console.log('Internship search parameters:', { 
+          jobTitles, 
+          keywords, 
+          isPersonalizedMatch: !!isPersonalizedMatch
+        });
+        
+        // Search for internships using the provided terms with our tiered approach
+        results = await findInternships(
+          jobTitles || [], 
+          keywords || [],
+          limit || 10
+        );
+      } else {
+        return res.status(400).json({ 
+          success: false,
+          message: 'At least one search parameter (jobTitles, keywords, or searchQuery) is required'
+        });
+      }
       
       // Track job counts from each source
       let totalRapidApiJobs = 0;

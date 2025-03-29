@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Loader2 } from "lucide-react"
+import { Loader2, Search, BriefcaseBusiness, Sparkles } from "lucide-react"
 import { apiRequest } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
 import { matchQuizResultsToCategories, getJobSearchTerms } from "../../utils/careerMappings"
+import { Input } from "@/components/ui/input"
 
 interface InternshipsScreenProps {
   handleBack: () => void
@@ -22,6 +23,7 @@ interface Internship {
   candidate_required_location: string
   salary?: string
   description: string
+  matchScore?: number
 }
 
 export default function InternshipsScreen({ handleBack, quizResults, interests }: InternshipsScreenProps) {
@@ -33,6 +35,9 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
   const [careerCategories, setCareerCategories] = useState<string[]>([])
   const [categoryJobs, setCategoryJobs] = useState<Record<string, Internship[]>>({})
   const [apiStatusMessage, setApiStatusMessage] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState<string>("")
+  const [isSearching, setIsSearching] = useState(false)
+  const [isAIMatching, setIsAIMatching] = useState(false)
 
   // Search for internships based on quiz results and interests
   useEffect(() => {
@@ -234,6 +239,218 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
   const handleCategorySelect = (category: string) => {
     setSelectedCategory(category)
   }
+  
+  // Handle search button click to search for internships
+  const handleSearchInternships = async () => {
+    if (searchQuery.trim().length < 2) return;
+    
+    try {
+      setIsSearching(true);
+      setError(null);
+      
+      // Call the API to search for internships by keyword
+      const response = await apiRequest('POST', '/api/internships/search', {
+        searchQuery: searchQuery.trim(),
+        limit: 20
+      });
+      
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.message || "Failed to search for internships");
+      }
+      
+      // Process the results
+      const allInternships: Internship[] = [];
+      const internshipsByCategory: Record<string, Internship[]> = {};
+      
+      // Add "Search Results" as a special category
+      const searchResultsCategory = `Results for "${searchQuery}"`;
+      internshipsByCategory[searchResultsCategory] = [];
+      
+      // Process results from all sources (RapidAPI, Remotive, Google)
+      Object.entries(data.results).forEach(([source, results]: [string, any]) => {
+        if (Array.isArray(results)) {
+          results.forEach((result: any) => {
+            if (result.jobs && Array.isArray(result.jobs)) {
+              // Add all jobs to the search results category
+              internshipsByCategory[searchResultsCategory].push(...result.jobs);
+              allInternships.push(...result.jobs);
+              
+              // Also organize by their original categories
+              const categoryName = result.query;
+              if (categoryName) {
+                if (!internshipsByCategory[categoryName]) {
+                  internshipsByCategory[categoryName] = [];
+                }
+                internshipsByCategory[categoryName].push(...result.jobs);
+              }
+            }
+          });
+        }
+      });
+      
+      // Update state with search results
+      setCategoryJobs(internshipsByCategory);
+      setInternships(allInternships);
+      
+      // Select the search results category
+      setSelectedCategory(searchResultsCategory);
+      
+      // Handle API status message if present
+      if (data.message) {
+        setApiStatusMessage(data.message);
+      }
+      
+      if (allInternships.length === 0) {
+        setError(`No internships found matching "${searchQuery}". Try different keywords.`);
+      }
+      
+      toast({
+        title: "Search Complete",
+        description: `Found ${allInternships.length} internships matching "${searchQuery}"`,
+        variant: allInternships.length > 0 ? "default" : "destructive"
+      });
+    } catch (err) {
+      console.error("Error searching for internships:", err);
+      setError("Failed to search for internships. Please try again later.");
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "An error occurred",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+  
+  // Handle AI match button click with Gemini AI
+  const handleAIMatch = async () => {
+    try {
+      setIsAIMatching(true);
+      setError(null);
+      
+      // Get the primary personality type from quiz results
+      const primaryType = quizResults?.primaryType?.name || quizResults?.dominantType;
+      
+      if (!primaryType) {
+        toast({
+          title: "Incomplete Profile",
+          description: "Please complete your career quiz first to get personalized matches.",
+          variant: "destructive"
+        });
+        setIsAIMatching(false);
+        return;
+      }
+      
+      toast({
+        title: "Finding Perfect Match",
+        description: `Analyzing your ${primaryType} personality type and career interests with AI...`,
+      });
+      
+      // Create simplified user profile with interests
+      const userProfile = {
+        interests: interests || [],
+        personalityType: primaryType
+      };
+      
+      // Call the new AI-powered match endpoint
+      const response = await apiRequest('POST', '/api/internships/match', {
+        userProfile,
+        quizResults,
+        jobTitles: [],
+        keywords: [],
+        limit: 20
+      });
+      
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.message || "Failed to match internships with AI");
+      }
+      
+      // Process the results
+      const allInternships: Internship[] = [];
+      const internshipsByCategory: Record<string, Internship[]> = {};
+      
+      // Special category for personalized AI matches
+      const matchCategory = "AI Recommended Matches";
+      internshipsByCategory[matchCategory] = [];
+      
+      // Get AI analysis results
+      const aiRecommendations = data.matching?.recommendations || "No specific AI recommendations found.";
+      const topMatches = data.matching?.topMatches || [];
+      const matchScores = data.matching?.matchScores || {};
+      
+      // Process internship results from all sources
+      Object.entries(data.results).forEach(([source, results]: [string, any]) => {
+        if (Array.isArray(results)) {
+          results.forEach((result: any) => {
+            if (result.jobs && Array.isArray(result.jobs)) {
+              const categoryName = result.query;
+              
+              // Add all jobs to both categories
+              const enhancedJobs = result.jobs.map((job: Internship) => {
+                // Add match score from AI if available (or default to 85%)
+                const matchScore = matchScores[job.title] || 85;
+                return {
+                  ...job,
+                  matchScore
+                };
+              });
+              
+              // Sort by match score if available
+              const sortedJobs = enhancedJobs.sort((a: any, b: any) => {
+                return (b.matchScore || 0) - (a.matchScore || 0);
+              });
+              
+              // Add to AI matches category
+              internshipsByCategory[matchCategory].push(...sortedJobs);
+              allInternships.push(...sortedJobs);
+              
+              // Also maintain original category
+              if (categoryName) {
+                if (!internshipsByCategory[categoryName]) {
+                  internshipsByCategory[categoryName] = [];
+                }
+                internshipsByCategory[categoryName].push(...sortedJobs);
+              }
+            }
+          });
+        }
+      });
+      
+      // Update state with match results
+      setCategoryJobs(internshipsByCategory);
+      setInternships(allInternships);
+      
+      // Select the AI matches category
+      setSelectedCategory(matchCategory);
+      
+      // Show AI recommendations in a message
+      setApiStatusMessage(aiRecommendations);
+      
+      if (allInternships.length === 0) {
+        setError("No matching internships found for your profile. Try updating your interests or quiz results.");
+      }
+      
+      toast({
+        title: "AI Match Complete",
+        description: `Found ${allInternships.length} internships matching your ${primaryType} personality and interests`,
+        variant: allInternships.length > 0 ? "default" : "destructive"
+      });
+    } catch (err) {
+      console.error("Error matching internships with AI:", err);
+      setError("Failed to match internships. Please try again later.");
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "An error occurred while analyzing with AI",
+        variant: "destructive"
+      });
+    } finally {
+      setIsAIMatching(false);
+    }
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -298,6 +515,61 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
             </div>
           </div>
         )}
+        
+        {/* Search & Match Tools */}
+        <div className="mb-6 space-y-4">
+          {/* Search Input */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+              <Input
+                type="text"
+                placeholder="Search for internships by keyword..."
+                className="pl-9 pr-4 py-2"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSearchInternships();
+                  }
+                }}
+              />
+            </div>
+            <Button 
+              onClick={handleSearchInternships}
+              disabled={isSearching || searchQuery.trim().length < 2}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {isSearching ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Searching...
+                </>
+              ) : (
+                'Search'
+              )}
+            </Button>
+          </div>
+          
+          {/* AI Match Button */}
+          <Button 
+            onClick={handleAIMatch}
+            disabled={isAIMatching || isLoading}
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white"
+          >
+            {isAIMatching ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Finding your perfect match...
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4" />
+                Match an Internship/Job Based on Your Profile
+              </>
+            )}
+          </Button>
+        </div>
         
         {/* Career Category Pills */}
         {careerCategories.length > 0 && (
