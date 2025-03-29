@@ -395,17 +395,11 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
   const handleViewDetails = async () => {
     const results = generateCareerData()
     
-    // Save quiz completion status and quiz results to both sessionStorage and localStorage
+    // Make sure quiz completion is stored in sessionStorage
     try {
-      // Store quiz completion flag
       sessionStorage.setItem('quizCompleted', 'true')
-      
-      // Store full quiz results in localStorage for persistence
-      localStorage.setItem('aether_quiz_results', JSON.stringify(results))
-      
-      console.log("Quiz results saved to localStorage for persistence")
     } catch (error) {
-      console.error('Error storing quiz data to localStorage:', error)
+      console.error('Error storing quiz completion status:', error)
     }
     
     try {
@@ -423,7 +417,7 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
       if (!authData.isAuthenticated) {
         toast({
           title: "Authentication Required",
-          description: "Please log in first to save results to your profile. However, your results have been saved locally.",
+          description: "Please log in first to save results to your profile.",
           variant: "destructive",
         })
         // Still return results to the home screen
@@ -496,35 +490,26 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
     const data = generateCareerData().chartData
     
     return (
-      <div className="flex flex-col items-center">
-        <ResponsiveContainer width="100%" height={180}>
-          <PieChart>
-            <Pie
-              data={data}
-              cx="50%"
-              cy="50%"
-              innerRadius={40}
-              outerRadius={60}
-              paddingAngle={5}
-              dataKey="value"
-              label={false}
-            >
-              {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.color} />
-              ))}
-            </Pie>
-          </PieChart>
-        </ResponsiveContainer>
-        
-        <div className="w-full mt-2 grid grid-cols-2 gap-x-2 gap-y-1 text-sm">
-          {data.map((entry) => (
-            <div key={entry.name} className="flex items-center">
-              <div className="w-3 h-3 mr-2" style={{ backgroundColor: entry.color }}></div>
-              <span>{entry.name}: {entry.value}%</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      <ResponsiveContainer width="100%" height={250}>
+        <PieChart>
+          <Pie
+            data={data}
+            cx="50%"
+            cy="50%"
+            innerRadius={60}
+            outerRadius={80}
+            paddingAngle={5}
+            dataKey="value"
+            label={({name, percent}) => `${name}: ${(percent * 100).toFixed(0)}%`}
+          >
+            {data.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={entry.color} />
+            ))}
+          </Pie>
+          <Tooltip formatter={(value) => `${value}%`} />
+          <Legend />
+        </PieChart>
+      </ResponsiveContainer>
     )
   }
 
