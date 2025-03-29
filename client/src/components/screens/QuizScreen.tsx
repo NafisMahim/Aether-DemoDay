@@ -403,7 +403,7 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
     }
     
     try {
-      // Prepare quiz results data
+      // Prepare quiz results data with ALL needed properties
       const quizData = {
         primaryType: {
           name: results.primaryType?.name || '',
@@ -422,10 +422,28 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
         dominantType: results.primaryType?.name || '',
         analysis: analysisResult,
         summary: careerSummary,
-        savedAt: new Date().toISOString()
+        savedAt: new Date().toISOString(),
+        // Additional data for completeness
+        chartData: results.chartData || [],
+        strengths: [results.primaryType?.description || '']
       }
       
-      console.log("Saving quiz results:", quizData)
+      // ALWAYS save to localStorage FIRST to ensure data persistence
+      // This is critical for when server storage fails
+      try {
+        localStorage.setItem('quizResults', JSON.stringify(quizData))
+        console.log("✅ Quiz results GUARANTEED saved to localStorage first")
+        
+        // Set a timestamp to track when results were last saved
+        localStorage.setItem('quizResultsTimestamp', new Date().toISOString())
+        
+        // Also store in sessionStorage for redundancy
+        sessionStorage.setItem('quizResults', JSON.stringify(quizData))
+      } catch (localError) {
+        console.error("Failed to save quiz results to localStorage:", localError)
+      }
+      
+      console.log("Saving quiz results to server:", quizData)
       
       try {
         // Save quiz results to the database via new API endpoint
@@ -433,22 +451,14 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
         
         if (response.ok) {
           const responseData = await response.json()
-          console.log("Save response:", responseData)
+          console.log("Save response from server:", responseData)
           
           toast({
             title: "Success!",
             description: "Your assessment results have been saved to your profile.",
           })
           
-          // Store these results in localStorage as a backup
-          try {
-            localStorage.setItem('quizResults', JSON.stringify(quizData))
-            console.log("Quiz results also saved to localStorage as backup")
-          } catch (err) {
-            console.error("Could not save quiz results to localStorage:", err)
-          }
-          
-          // Pass quiz data back for navigation
+          // Pass quiz data back for navigation, redundantly set to ensure quizResults are never lost
           handleBack(quizData)
         } else {
           // If response is 401 Unauthorized, we need to inform the user
@@ -563,12 +573,35 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
         categories: results.categories || [],
         hybridCareers: results.hybridCareers || [],
         dominantType: results.primaryType?.name || '',
-        savedAt: new Date().toISOString()
+        savedAt: new Date().toISOString(),
+        // Add chart data and other fields for completeness
+        chartData: results.chartData || [],
+        strengths: [results.primaryType?.description || ''],
+        analysis: analysisResult,
+        summary: careerSummary
       }
       
-      // Save to localStorage for persistence
+      // Save to both localStorage and sessionStorage for redundant persistence
       localStorage.setItem('quizResults', JSON.stringify(quizData))
-      console.log("Quiz results saved to localStorage from Return Home button")
+      sessionStorage.setItem('quizResults', JSON.stringify(quizData))
+      localStorage.setItem('quizResultsTimestamp', new Date().toISOString())
+      console.log("✅ Quiz results GUARANTEED saved to localStorage from Return Home button")
+      
+      // Also try to save to server in the background
+      try {
+        // Don't await this call - let it happen in the background
+        apiRequest('POST', '/api/quiz/results', quizData)
+          .then(response => {
+            if (response.ok) {
+              console.log("Successfully saved quiz results to server in background")
+            }
+          })
+          .catch(error => {
+            console.error("Background save to server failed, but localStorage save successful:", error)
+          })
+      } catch (apiError) {
+        console.error("Failed to initiate background save to server:", apiError)
+      }
       
       // Pass structured data back
       handleBack(quizData)
@@ -666,17 +699,70 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
                 categories: results.categories || [],
                 hybridCareers: results.hybridCareers || [],
                 dominantType: results.primaryType?.name || '',
-                savedAt: new Date().toISOString()
+                savedAt: new Date().toISOString(),
+                // Add chart data and other fields for completeness
+                chartData: results.chartData || [],
+                strengths: [results.primaryType?.description || ''],
+                analysis: analysisResult,
+                summary: careerSummary
               };
+              
+              // Save to multiple storage mechanisms for redundancy
               localStorage.setItem('quizResults', JSON.stringify(quizData));
-              console.log("Quiz results saved to localStorage from back button");
+              sessionStorage.setItem('quizResults', JSON.stringify(quizData));
+              localStorage.setItem('quizResultsTimestamp', new Date().toISOString());
+              console.log("✅ Quiz results GUARANTEED saved to localStorage from back button");
+              
+              // Also try to save to server in the background
+              try {
+                // Don't await this call - let it happen in the background
+                apiRequest('POST', '/api/quiz/results', quizData)
+                  .then(response => {
+                    if (response.ok) {
+                      console.log("Successfully saved quiz results to server in background from back button")
+                    }
+                  })
+                  .catch(error => {
+                    console.error("Background save to server failed, but localStorage save successful from back button:", error)
+                  })
+              } catch (apiError) {
+                console.error("Failed to initiate background save to server from back button:", apiError)
+              }
+              
               handleBack(quizData);
             } catch (err) {
               console.error("Could not save quiz results from back button:", err);
+              
+              // Try to load from localStorage as a fallback before returning home
+              try {
+                const savedResults = localStorage.getItem('quizResults');
+                if (savedResults) {
+                  console.log("Using previously saved quiz results from localStorage instead");
+                  const parsedResults = JSON.parse(savedResults);
+                  handleBack(parsedResults);
+                  return;
+                }
+              } catch (loadError) {
+                console.error("Failed to load backup quiz results:", loadError);
+              }
+              
               handleBack();
             }
           } else {
-            // If in question phase, just go back
+            // Check if we should preserve previously saved quiz results
+            try {
+              const savedResults = localStorage.getItem('quizResults');
+              if (savedResults) {
+                console.log("Found saved quiz results in localStorage");
+                const parsedResults = JSON.parse(savedResults);
+                handleBack(parsedResults);
+                return;
+              }
+            } catch (error) {
+              console.error("Error checking localStorage for quiz results:", error);
+            }
+            
+            // If no saved results, just go back
             handleBack();
           }
         }}>

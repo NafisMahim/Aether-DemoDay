@@ -68,6 +68,21 @@ export default function AetherApp() {
   const [user, setUser] = useState<any>(null)
   const [isAuthenticating, setIsAuthenticating] = useState(true)
 
+  // Load quiz results from localStorage (regardless of auth status)
+  useEffect(() => {
+    try {
+      const localQuizData = localStorage.getItem('quizResults');
+      if (localQuizData) {
+        const parsedData = JSON.parse(localQuizData);
+        console.log('Initial load of quiz results from localStorage:', parsedData);
+        // Always set quiz results from localStorage on initial load if available
+        setQuizResults(parsedData);
+      }
+    } catch (error) {
+      console.error('Error loading quiz results from localStorage on initial load:', error);
+    }
+  }, []);
+
   // Check authentication status on load
   useEffect(() => {
     const checkAuthStatus = async () => {
@@ -84,7 +99,7 @@ export default function AetherApp() {
             interests: userData.interests // Keep default interests for now
           })
           
-          let foundQuizResults = false;
+          let serverQuizResults = null;
           
           // Fetch quiz results from API if user is authenticated
           try {
@@ -97,8 +112,15 @@ export default function AetherApp() {
               console.log('Retrieved quiz results from server:', quizData)
               
               if (quizData.success && quizData.results) {
-                setQuizResults(quizData.results)
-                foundQuizResults = true;
+                // Save to server results for comparison
+                serverQuizResults = quizData.results;
+                
+                // Set as current quiz results
+                setQuizResults(quizData.results);
+                
+                // Always ensure the server results are also cached in localStorage
+                localStorage.setItem('quizResults', JSON.stringify(quizData.results));
+                console.log('Saved server quiz results to localStorage for persistence');
               }
             } else if (quizResponse.status !== 404) {
               // Don't log 404s as errors since it's normal for new users
@@ -108,13 +130,13 @@ export default function AetherApp() {
             console.error('Error fetching quiz results:', quizError)
           }
           
-          // If quiz results weren't found from the server, check localStorage
-          if (!foundQuizResults) {
+          // If no server results but we have localStorage data, push it to the server
+          if (!serverQuizResults) {
             try {
               const localQuizData = localStorage.getItem('quizResults')
               if (localQuizData) {
                 const parsedData = JSON.parse(localQuizData)
-                console.log('Retrieved quiz results from localStorage:', parsedData)
+                console.log('Using localStorage quiz results since server had none:', parsedData)
                 setQuizResults(parsedData)
                 
                 // Also save to server for future sessions
@@ -133,6 +155,18 @@ export default function AetherApp() {
           }
           
           setCurrentScreen("home")
+        } else {
+          // Not authenticated, ensure we still try to load from localStorage
+          try {
+            const localQuizData = localStorage.getItem('quizResults');
+            if (localQuizData && !quizResults) { // Only set if not already set by initial load
+              const parsedData = JSON.parse(localQuizData);
+              console.log('Not authenticated, loading quiz results from localStorage:', parsedData);
+              setQuizResults(parsedData);
+            }
+          } catch (error) {
+            console.error('Error loading quiz results from localStorage when not authenticated:', error);
+          }
         }
       } catch (error) {
         console.error('Error checking auth status:', error)

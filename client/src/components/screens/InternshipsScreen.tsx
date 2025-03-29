@@ -26,7 +26,7 @@ interface Internship {
   matchScore?: number
 }
 
-export default function InternshipsScreen({ handleBack, quizResults, interests }: InternshipsScreenProps) {
+export default function InternshipsScreen({ handleBack, quizResults: initialQuizResults, interests }: InternshipsScreenProps) {
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [internships, setInternships] = useState<Internship[]>([])
@@ -37,8 +37,44 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
   const [apiStatusMessage, setApiStatusMessage] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState<string>("")
   const [isSearching, setIsSearching] = useState(false)
+  const [quizResults, setQuizResults] = useState<any>(initialQuizResults)
   const [isAIMatching, setIsAIMatching] = useState(false)
 
+  // Try to load quiz results from localStorage if they're not provided via props
+  useEffect(() => {
+    if (!quizResults || Object.keys(quizResults).length === 0) {
+      try {
+        const savedResults = localStorage.getItem('quizResults');
+        if (savedResults) {
+          const parsedResults = JSON.parse(savedResults);
+          console.log('📋 Retrieved missing quiz results from localStorage in InternshipsScreen:', parsedResults);
+          
+          // Set the quiz results immediately to use in the component
+          setQuizResults(parsedResults);
+          
+          // Also try to save to server in the background to ensure future persistence
+          if (parsedResults) {
+            try {
+              apiRequest('POST', '/api/quiz/results', parsedResults)
+                .then(response => {
+                  if (response.ok) {
+                    console.log("Successfully synced localStorage quiz results to server from InternshipsScreen");
+                  }
+                })
+                .catch(error => {
+                  console.error("Failed to sync localStorage quiz results to server:", error);
+                });
+            } catch (apiError) {
+              console.error("Error initiating quiz results sync to server:", apiError);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading quiz results from localStorage in InternshipsScreen:', error);
+      }
+    }
+  }, []);
+  
   // Search for internships based on quiz results and interests
   useEffect(() => {
     const searchForInternships = async () => {
