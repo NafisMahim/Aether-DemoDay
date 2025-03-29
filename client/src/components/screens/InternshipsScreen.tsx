@@ -328,6 +328,8 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
     }
   };
   
+  const [showIncompleteProfileBanner, setShowIncompleteProfileBanner] = useState(false);
+  
   // Handle AI match button click with Gemini AI
   const handleAIMatch = async () => {
     try {
@@ -338,11 +340,8 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
       const primaryType = quizResults?.primaryType?.name || quizResults?.dominantType;
       
       if (!primaryType) {
-        toast({
-          title: "Incomplete Profile",
-          description: "Please complete your career quiz first to get personalized matches.",
-          variant: "destructive"
-        });
+        // Display custom banner instead of toast
+        setShowIncompleteProfileBanner(true);
         setIsAIMatching(false);
         return;
       }
@@ -470,6 +469,37 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
 
       {/* Content */}
       <div className="flex-1 px-5 py-4 overflow-y-auto">
+        {/* Incomplete Profile Banner */}
+        {showIncompleteProfileBanner && (
+          <div className="bg-white rounded-xl shadow-md p-5 mb-4 border-l-4 border-red-500">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.485 3.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 3.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">Incomplete Profile</h3>
+                <div className="mt-1 text-sm text-red-700">
+                  <p>Please complete your career quiz first to get personalized matches.</p>
+                </div>
+                <div className="mt-3">
+                  <Button 
+                    size="sm"
+                    onClick={() => {
+                      setShowIncompleteProfileBanner(false);
+                      handleBack();
+                    }}
+                    className="bg-red-100 text-red-800 hover:bg-red-200"
+                  >
+                    Take Quiz
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* Description */}
         <div className="mb-4">
           <p className="text-gray-600">
