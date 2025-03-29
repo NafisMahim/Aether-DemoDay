@@ -252,13 +252,11 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
       setIsSearching(true);
       setError(null);
       
-      // API request now automatically sanitizes data in queryClient.ts
-      const searchData = {
+      // Call the API to search for internships by keyword
+      const response = await apiRequest('POST', '/api/internships/search', {
         searchQuery: searchQuery.trim(),
         limit: 20
-      };
-      
-      const response = await apiRequest('POST', '/api/internships/search', searchData);
+      });
       
       const data = await response.json();
       
@@ -359,10 +357,10 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
         personalityType: primaryType
       };
       
-      // API request now automatically sanitizes data in queryClient.ts
+      // Call the new AI-powered match endpoint
       const response = await apiRequest('POST', '/api/internships/match', {
         userProfile,
-        quizResults, // No need to manually sanitize - handled by apiRequest
+        quizResults,
         jobTitles: [],
         keywords: [],
         limit: 20

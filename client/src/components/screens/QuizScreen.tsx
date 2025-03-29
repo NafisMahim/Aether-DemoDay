@@ -490,46 +490,26 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
     const data = generateCareerData().chartData
     
     return (
-      <div>
-        <div className="flex justify-center mb-4">
-          <div className="w-[180px] h-[180px] relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={data}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={40}
-                  outerRadius={60}
-                  paddingAngle={5}
-                  dataKey="value"
-                  label={false}
-                >
-                  {data.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => `${value}%`} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-        
-        {/* Custom Legend exactly matching the screenshot */}
-        <div className="flex flex-col items-start gap-1.5 mt-2">
-          {data.map((entry, index) => (
-            <div key={`legend-${index}`} className="flex items-center">
-              <div
-                className="w-4 h-4 inline-block mr-2"
-                style={{ backgroundColor: entry.color }}
-              />
-              <span className="text-[15px]" style={{ color: entry.color }}>
-                {entry.name}: {entry.value}%
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
+      <ResponsiveContainer width="100%" height={250}>
+        <PieChart>
+          <Pie
+            data={data}
+            cx="50%"
+            cy="50%"
+            innerRadius={60}
+            outerRadius={80}
+            paddingAngle={5}
+            dataKey="value"
+            label={({name, percent}) => `${name}: ${(percent * 100).toFixed(0)}%`}
+          >
+            {data.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={entry.color} />
+            ))}
+          </Pie>
+          <Tooltip formatter={(value) => `${value}%`} />
+          <Legend />
+        </PieChart>
+      </ResponsiveContainer>
     )
   }
 

@@ -8,7 +8,6 @@ import { configurePassport, hashPassword } from "./auth";
 import MemoryStore from "memorystore";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { findInternships, generateInternshipRecommendations } from "./internshipService";
-import { sanitizeForJson } from "./utils/jsonUtils";
 
 // Initialize Gemini AI
 const geminiApiKey = process.env.GEMINI_API_KEY;
@@ -189,8 +188,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       return res.status(200).json({
         success: true,
-        results: sanitizeForJson(internships),
-        matching: sanitizeForJson(matchResults),
+        results: internships,
+        matching: matchResults,
         searchTerms: uniqueTerms
       });
     } catch (error) {
@@ -334,7 +333,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create response with source information
       return res.status(200).json({
         success: true,
-        results: sanitizeForJson(results),
+        results: results,
         message: message,
         totalJobs: totalJobs,
         categories: {
