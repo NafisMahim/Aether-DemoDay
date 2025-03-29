@@ -55,13 +55,7 @@ export default function AetherApp() {
     name: "Richard Wang",
     bio: "Exploring new opportunities and personal growth!",
     profileImage: "",
-    interests: [
-      { id: 1, category: "Technology", subcategories: "Web Development, AI, Mobile Apps" },
-      { id: 2, category: "Travel", subcategories: "Hiking, Backpacking, Urban Exploration" },
-      { id: 3, category: "Photography", subcategories: "Portrait, Landscape, Street" },
-      { id: 4, category: "Cooking", subcategories: "Asian Cuisine, Baking, Grilling" },
-      { id: 5, category: "Reading", subcategories: "Science Fiction, Biographies, Tech" }
-    ]
+    interests: [] // Start with no interests - users will add them or they'll be derived from quiz
   })
 
   // Auth status query
