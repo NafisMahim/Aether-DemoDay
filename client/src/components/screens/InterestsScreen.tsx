@@ -216,46 +216,61 @@ export default function InterestsScreen({ handleBack, interests, setUserData, na
         </div>
       </div>
       
-      {/* Quiz Completion Dialog - Original popup design */}
-      <Dialog open={showQuizPrompt} onOpenChange={setShowQuizPrompt}>
-        <DialogContent className="p-0 bg-white rounded-3xl shadow-lg overflow-hidden max-w-xs mx-auto">
-          <div className="bg-blue-500 p-4 text-white flex justify-between items-center">
-            <h3 className="text-lg font-semibold">Take the Quiz First</h3>
-            <button onClick={() => setShowQuizPrompt(false)} className="text-white hover:text-blue-100">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-          </div>
-          
-          <div className="p-5">
-            <p className="text-sm text-gray-600 mb-5">
-              To find personalized internship recommendations, please complete the career assessment quiz first.
-            </p>
+      {/* Redesigned In-App Quiz Notification */}
+      {showQuizPrompt && (
+        <div className="absolute inset-0 flex flex-col justify-center items-center px-6 bg-black/50 z-50">
+          <div className="w-full max-w-xs bg-white rounded-3xl overflow-hidden shadow-2xl animate-fade-in-up">
+            <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-5">
+              <div className="flex items-center space-x-3 mb-3">
+                <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-white">Insights Needed</h3>
+              </div>
+              <p className="text-white/90 text-sm">
+                Complete your career assessment to unlock personalized internship recommendations.
+              </p>
+            </div>
             
-            <div className="flex justify-end space-x-2">
-              <Button 
-                variant="outline" 
-                size="sm"
-                className="rounded-full text-sm"
-                onClick={() => setShowQuizPrompt(false)}
-              >
-                Later
-              </Button>
-              <Button 
-                size="sm"
-                className="bg-blue-500 text-white rounded-full text-sm"
-                onClick={() => {
-                  setShowQuizPrompt(false)
-                  navigateTo("quiz")
-                }}
-              >
-                Take Quiz
-              </Button>
+            <div className="p-5 bg-gradient-to-b from-white to-blue-50">
+              <div className="flex items-center mb-4">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-900">Career Quiz Unlocks:</p>
+                  <p className="text-xs text-gray-600">Matched internships based on your profile</p>
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-3">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="rounded-full text-sm px-4 py-2 text-gray-700"
+                  onClick={() => setShowQuizPrompt(false)}
+                >
+                  Later
+                </Button>
+                <Button 
+                  size="sm"
+                  className="rounded-full text-sm px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md"
+                  onClick={() => {
+                    setShowQuizPrompt(false)
+                    navigateTo("quiz")
+                  }}
+                >
+                  Take Quiz
+                </Button>
+              </div>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
     </div>
   )
 }
