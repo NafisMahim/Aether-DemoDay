@@ -1190,6 +1190,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { message, history } = req.body;
       
+      // Get user quiz results if authenticated
+      let userContext = "";
+      if (req.isAuthenticated() && req.user) {
+        try {
+          const userId = (req.user as any).id;
+          const quizResults = await storage.getQuizResults(userId);
+          
+          if (quizResults) {
+            userContext = `
+User's quiz results: ${JSON.stringify(quizResults)}
+            
+Based on this user's profile, personalize your career advice while respecting their privacy.
+`;
+          }
+        } catch (error) {
+          console.error("Error fetching user quiz results for chatbot:", error);
+          // Continue without user context if there's an error
+        }
+      }
+      
       if (!message) {
         return res.status(400).json({
           success: false,
@@ -1218,13 +1238,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Create a chat session
+      // Create a chat session with career advice and app assistant context
       const chat = model.startChat({
         history: formattedHistory,
         generationConfig: {
           maxOutputTokens: 1000,
           temperature: 0.7,
         },
+        systemInstruction: `You are A1, an AI career development assistant for the Aether app. 
+        
+Your primary functions are:
+1. Providing personalized career advice based on the user's profile, skills, and quiz results
+2. Explaining Aether app features (Home, Quiz, Interests, Profile, Internships)
+3. Guiding users through career exploration based on their skills and interests
+4. Offering advice on skill development and job searching strategies
+
+Key app features to know:
+- Quiz: Assesses user's personality traits and provides career recommendations
+- Interests: Allows users to explore and save career interests
+- Internships: Helps find relevant internships based on skills and interests
+- Profile: Stores user information, quiz results, and career preferences
+
+When users ask about career options, reference practical careers like:
+- Software Development
+- Product Management
+- Data Analysis
+- IT Support
+- UX/UI Design
+- Digital Marketing
+- Business Analysis
+
+${userContext}
+
+Keep responses concise (3-5 sentences), professional, encouraging, and focused on career development. If you don't know an answer, suggest using the appropriate app feature rather than making up information.`,
       });
 
       // Generate response

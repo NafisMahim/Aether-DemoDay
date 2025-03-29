@@ -28,7 +28,7 @@ export default function ChatbotScreen({ handleBack }: ChatbotScreenProps) {
     {
       id: "welcome",
       role: "assistant",
-      content: "Hello! I'm A1, your AI assistant. How can I help you today?",
+      content: "Hello! I'm A1, your career development assistant. I can help with career advice based on your profile, explain app features, suggest internships, or answer questions about skill development. How can I help you today?",
       timestamp: new Date(),
     },
   ]);
