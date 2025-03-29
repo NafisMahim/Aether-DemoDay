@@ -395,11 +395,17 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
   const handleViewDetails = async () => {
     const results = generateCareerData()
     
-    // Make sure quiz completion is stored in sessionStorage
+    // Save quiz completion status and quiz results to both sessionStorage and localStorage
     try {
+      // Store quiz completion flag
       sessionStorage.setItem('quizCompleted', 'true')
+      
+      // Store full quiz results in localStorage for persistence
+      localStorage.setItem('aether_quiz_results', JSON.stringify(results))
+      
+      console.log("Quiz results saved to localStorage for persistence")
     } catch (error) {
-      console.error('Error storing quiz completion status:', error)
+      console.error('Error storing quiz data to localStorage:', error)
     }
     
     try {
@@ -417,7 +423,7 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
       if (!authData.isAuthenticated) {
         toast({
           title: "Authentication Required",
-          description: "Please log in first to save results to your profile.",
+          description: "Please log in first to save results to your profile. However, your results have been saved locally.",
           variant: "destructive",
         })
         // Still return results to the home screen

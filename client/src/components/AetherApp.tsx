@@ -83,6 +83,26 @@ export default function AetherApp() {
         
         if (data.isAuthenticated && data.user) {
           setUser(data.user)
+          
+          // Load quiz results if available
+          if (data.user.quizResults) {
+            console.log('Loading quiz results from user data:', data.user.quizResults)
+            setQuizResults(data.user.quizResults)
+          } else {
+            console.log('No quiz results found in user data')
+            // Try to load from local storage as fallback
+            try {
+              const storedQuizResults = localStorage.getItem('aether_quiz_results')
+              if (storedQuizResults) {
+                const parsedResults = JSON.parse(storedQuizResults)
+                console.log('Loaded quiz results from local storage:', parsedResults)
+                setQuizResults(parsedResults)
+              }
+            } catch (e) {
+              console.error('Error loading quiz results from local storage:', e)
+            }
+          }
+          
           setUserData({
             name: data.user.displayName || data.user.username,
             bio: data.user.bio || "Exploring new opportunities and personal growth!",
@@ -112,6 +132,26 @@ export default function AetherApp() {
         setUser(data.user)
         setCurrentScreen("home")
         setErrorMessage("")
+        
+        // Load quiz results if available
+        if (data.user.quizResults) {
+          console.log('Loading quiz results from login response:', data.user.quizResults)
+          setQuizResults(data.user.quizResults)
+        } else {
+          console.log('No quiz results found in login response')
+          // Try to load from local storage as fallback
+          try {
+            const storedQuizResults = localStorage.getItem('aether_quiz_results')
+            if (storedQuizResults) {
+              const parsedResults = JSON.parse(storedQuizResults)
+              console.log('Loaded quiz results from local storage:', parsedResults)
+              setQuizResults(parsedResults)
+            }
+          } catch (e) {
+            console.error('Error loading quiz results from local storage:', e)
+          }
+        }
+        
         setUserData({
           ...userData, 
           name: data.user.displayName || data.user.username,
@@ -236,6 +276,16 @@ export default function AetherApp() {
   // Handle logout
   const handleLogout = async () => {
     try {
+      // Save quiz results to localStorage before logging out
+      if (quizResults) {
+        try {
+          localStorage.setItem('aether_quiz_results', JSON.stringify(quizResults))
+          console.log('Saved quiz results to localStorage before logout')
+        } catch (e) {
+          console.error('Error saving quiz results to localStorage:', e)
+        }
+      }
+      
       const response = await apiRequest("POST", "/api/logout")
       const data = await response.json()
       
@@ -252,6 +302,30 @@ export default function AetherApp() {
         variant: "destructive",
       })
     }
+  }
+  
+  // Ensure quiz results are available
+  const ensureQuizResults = () => {
+    if (!quizResults) {
+      // Try to load from localStorage
+      try {
+        const storedQuizResults = localStorage.getItem('aether_quiz_results')
+        if (storedQuizResults) {
+          const parsedResults = JSON.parse(storedQuizResults)
+          console.log('Loaded missing quiz results from localStorage:', parsedResults)
+          setQuizResults(parsedResults)
+          return parsedResults
+        }
+      } catch (e) {
+        console.error('Error loading quiz results from localStorage:', e)
+      }
+      
+      // If still no results, create default structure
+      console.log('No quiz results found, creating default structure')
+      return null
+    }
+    
+    return quizResults
   }
 
   // Handle back navigation
@@ -301,7 +375,7 @@ export default function AetherApp() {
             <HomeScreen 
               username={userData.name} 
               navigateTo={navigateTo} 
-              quizResults={{...quizResults, bio: userData.bio}} 
+              quizResults={{...(ensureQuizResults() || {}), bio: userData.bio}} 
               profileImage={userData.profileImage}
             />
           ) : currentScreen === "quiz" ? (
@@ -330,7 +404,7 @@ export default function AetherApp() {
             <ProfileScreen 
               handleBack={handleBack} 
               username={userData.name} 
-              quizResults={quizResults} 
+              quizResults={ensureQuizResults()} 
               bio={userData.bio} 
               profileImage={userData.profileImage}
               onLogout={handleLogout}
@@ -464,7 +538,7 @@ export default function AetherApp() {
           ) : currentScreen === "internships" ? (
             <InternshipsScreen 
               handleBack={handleBack} 
-              quizResults={quizResults}
+              quizResults={ensureQuizResults()}
               interests={userData.interests}
             />
           ) : (
