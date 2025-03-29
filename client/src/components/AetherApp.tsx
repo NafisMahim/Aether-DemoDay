@@ -5,6 +5,13 @@ import { useMutation } from "@tanstack/react-query"
 import { apiRequest } from "@/lib/queryClient"
 import { useToast } from "@/hooks/use-toast"
 
+// Define the Interest interface
+interface Interest {
+  id: number
+  category: string
+  subcategories: string
+}
+
 // Components
 import LoginScreen from "./screens/LoginScreen"
 import SignupScreen from "./screens/SignupScreen"
@@ -51,7 +58,12 @@ export default function AetherApp() {
   const [password, setPassword] = useState("")
   const [errorMessage, setErrorMessage] = useState("")
   const [quizResults, setQuizResults] = useState<any>(null)
-  const [userData, setUserData] = useState({
+  const [userData, setUserData] = useState<{
+    name: string;
+    bio: string;
+    profileImage: string;
+    interests: Interest[];
+  }>({
     name: "Richard Wang",
     bio: "Exploring new opportunities and personal growth!",
     profileImage: "",
