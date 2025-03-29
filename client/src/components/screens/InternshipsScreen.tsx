@@ -555,7 +555,7 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
           <Button 
             onClick={handleAIMatch}
             disabled={isAIMatching || isLoading}
-            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white"
+            className="w-full h-10 flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white font-medium"
           >
             {isAIMatching ? (
               <>
@@ -564,8 +564,8 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
               </>
             ) : (
               <>
-                <Sparkles className="h-4 w-4" />
-                Match an Internship/Job Based on Your Profile
+                <Sparkles className="h-4 w-4 mr-2" />
+                Find Your Perfect Match
               </>
             )}
           </Button>
