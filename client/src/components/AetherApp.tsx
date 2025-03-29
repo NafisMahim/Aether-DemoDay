@@ -381,19 +381,47 @@ export default function AetherApp() {
       // Set quiz results regardless of which page we're navigating to
       setQuizResults(data)
       
-      // Also save to server in the background for persistence between sessions
-      if (user && user.id) {
-        console.log("Auto-saving quiz results during navigation")
-        apiRequest("POST", "/api/quiz/results", data)
-          .then(response => response.json())
-          .then(responseData => {
-            console.log("Quiz results auto-saved during navigation:", responseData)
-          })
-          .catch(error => {
-            console.error("Failed to auto-save quiz results during navigation:", error)
-          })
+      // Always save to localStorage/sessionStorage for redundancy across all navigations
+      try {
+        console.log("Auto-saving quiz results during navigation to " + page, {
+          dataExists: !!data, 
+          dataKeys: Object.keys(data)
+        });
+        
+        // Make a deep copy to avoid reference issues
+        const dataCopy = JSON.parse(JSON.stringify(data));
+        
+        // Save to both storage methods for redundancy
+        localStorage.setItem('quizResults', JSON.stringify(dataCopy));
+        sessionStorage.setItem('quizResults', JSON.stringify(dataCopy));
+        
+        // Also save to server in the background for persistence between sessions
+        if (user && user.id) {
+          apiRequest("POST", "/api/quiz/results", dataCopy)
+            .then(response => response.json())
+            .then(responseData => {
+              console.log("Quiz results auto-saved to server during navigation:", responseData)
+            })
+            .catch(error => {
+              console.error("Failed to auto-save quiz results to server during navigation:", error)
+            })
+        }
+      } catch (error) {
+        console.error("Error saving quiz results during navigation:", error);
+      }
+    } else {
+      // Even if no new data is provided, ensure we preserve current quiz results
+      if (quizResults && Object.keys(quizResults).length > 0) {
+        try {
+          console.log("Preserving existing quiz results during navigation to " + page);
+          localStorage.setItem('quizResults', JSON.stringify(quizResults));
+          sessionStorage.setItem('quizResults', JSON.stringify(quizResults));
+        } catch (error) {
+          console.error("Error preserving quiz results during navigation:", error);
+        }
       }
     }
+    
     setCurrentScreen(page as any)
   }
 

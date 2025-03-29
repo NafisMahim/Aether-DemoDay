@@ -40,40 +40,97 @@ export default function InternshipsScreen({ handleBack, quizResults: initialQuiz
   const [quizResults, setQuizResults] = useState<any>(initialQuizResults)
   const [isAIMatching, setIsAIMatching] = useState(false)
 
-  // Try to load quiz results from localStorage if they're not provided via props
+  // Try to load quiz results from multiple sources if they're not provided via props
   useEffect(() => {
-    if (!quizResults || Object.keys(quizResults).length === 0) {
+    const loadQuizResultsFromAllSources = async () => {
+      // Skip if we already have quiz results
+      if (quizResults && Object.keys(quizResults).length > 0) {
+        console.log('Already have quiz results in InternshipsScreen, no need to load:', Object.keys(quizResults));
+        return;
+      }
+      
+      console.log('No quiz results available in InternshipsScreen, trying to load from all sources');
+      
+      // Try to load from multiple sources in order of preference
+      let loadedResults = null;
+      
+      // 1. Try sessionStorage first (most immediate)
       try {
-        const savedResults = localStorage.getItem('quizResults');
-        if (savedResults) {
-          const parsedResults = JSON.parse(savedResults);
-          console.log('📋 Retrieved missing quiz results from localStorage in InternshipsScreen:', parsedResults);
-          
-          // Set the quiz results immediately to use in the component
-          setQuizResults(parsedResults);
-          
-          // Also try to save to server in the background to ensure future persistence
-          if (parsedResults) {
-            try {
-              apiRequest('POST', '/api/quiz/results', parsedResults)
-                .then(response => {
-                  if (response.ok) {
-                    console.log("Successfully synced localStorage quiz results to server from InternshipsScreen");
-                  }
-                })
-                .catch(error => {
-                  console.error("Failed to sync localStorage quiz results to server:", error);
-                });
-            } catch (apiError) {
-              console.error("Error initiating quiz results sync to server:", apiError);
-            }
-          }
+        const sessionData = sessionStorage.getItem('quizResults');
+        if (sessionData) {
+          loadedResults = JSON.parse(sessionData);
+          console.log('📋 Retrieved quiz results from sessionStorage in InternshipsScreen:', Object.keys(loadedResults));
         }
       } catch (error) {
-        console.error('Error loading quiz results from localStorage in InternshipsScreen:', error);
+        console.error('Error loading quiz results from sessionStorage in InternshipsScreen:', error);
       }
-    }
-  }, []);
+      
+      // 2. Try localStorage if sessionStorage failed
+      if (!loadedResults) {
+        try {
+          const localData = localStorage.getItem('quizResults');
+          if (localData) {
+            loadedResults = JSON.parse(localData);
+            console.log('📋 Retrieved quiz results from localStorage in InternshipsScreen:', Object.keys(loadedResults));
+          }
+        } catch (error) {
+          console.error('Error loading quiz results from localStorage in InternshipsScreen:', error);
+        }
+      }
+      
+      // 3. Try server as last resort
+      if (!loadedResults) {
+        try {
+          const response = await fetch('/api/quiz/results', {
+            credentials: 'include'
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.results) {
+              loadedResults = data.results;
+              console.log('📋 Retrieved quiz results from server in InternshipsScreen:', Object.keys(loadedResults));
+              
+              // Save to local storage for future use
+              localStorage.setItem('quizResults', JSON.stringify(loadedResults));
+              sessionStorage.setItem('quizResults', JSON.stringify(loadedResults));
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching quiz results from server in InternshipsScreen:', error);
+        }
+      }
+      
+      // Set the quiz results if we found them
+      if (loadedResults) {
+        setQuizResults(loadedResults);
+        
+        // Make sure all storage methods have the latest data
+        try {
+          localStorage.setItem('quizResults', JSON.stringify(loadedResults));
+          sessionStorage.setItem('quizResults', JSON.stringify(loadedResults));
+          
+          // Also try to save to server in the background for persistence across devices
+          apiRequest('POST', '/api/quiz/results', loadedResults)
+            .then(response => {
+              if (response.ok) {
+                console.log("Successfully synced quiz results to server from InternshipsScreen");
+              }
+            })
+            .catch(error => {
+              console.error("Failed to sync quiz results to server from InternshipsScreen:", error);
+            });
+        } catch (error) {
+          console.error('Error saving loaded quiz results to storage in InternshipsScreen:', error);
+        }
+      } else {
+        console.error('Failed to load quiz results from any source in InternshipsScreen');
+        setError("Please complete your career assessment first.");
+      }
+    };
+    
+    loadQuizResultsFromAllSources();
+  }, [quizResults]);
   
   // Search for internships based on quiz results and interests
   useEffect(() => {
@@ -404,14 +461,46 @@ export default function InternshipsScreen({ handleBack, quizResults: initialQuiz
       setError(null);
       
       // Check if quiz results are available and properly structured
-      if (!quizResults) {
-        toast({
-          title: "Incomplete Profile",
-          description: "Please complete your career quiz first to get personalized matches.",
-          variant: "destructive"
-        });
-        setIsAIMatching(false);
-        return;
+      if (!quizResults || Object.keys(quizResults).length === 0) {
+        // Try one last attempt to recover quiz results from any source
+        let recoveredResults = null;
+        
+        // First try sessionStorage
+        try {
+          const sessionData = sessionStorage.getItem('quizResults');
+          if (sessionData) {
+            recoveredResults = JSON.parse(sessionData);
+            console.log('Emergency recovery of quiz results from sessionStorage for AI matching:', Object.keys(recoveredResults));
+            setQuizResults(recoveredResults);
+          }
+        } catch (error) {
+          console.error('Error in emergency recovery from sessionStorage:', error);
+        }
+        
+        // Then try localStorage if session storage failed
+        if (!recoveredResults) {
+          try {
+            const localData = localStorage.getItem('quizResults');
+            if (localData) {
+              recoveredResults = JSON.parse(localData);
+              console.log('Emergency recovery of quiz results from localStorage for AI matching:', Object.keys(recoveredResults));
+              setQuizResults(recoveredResults);
+            }
+          } catch (error) {
+            console.error('Error in emergency recovery from localStorage:', error);
+          }
+        }
+        
+        // If still no results, prompt the user
+        if (!recoveredResults) {
+          toast({
+            title: "Incomplete Profile",
+            description: "Please complete your career quiz first to get personalized matches.",
+            variant: "destructive"
+          });
+          setIsAIMatching(false);
+          return;
+        }
       }
       
       // Extract primary personality type from quiz results using all possible structures
