@@ -1255,18 +1255,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Create a chat session with career advice and app assistant context
+      // Create a chat session without system instructions (not supported in the API)
       const chat = model.startChat({
         history: formattedHistory,
         generationConfig: {
           maxOutputTokens: 1000,
           temperature: 0.7,
         },
-        systemInstruction: "You are A1, a career advisor for the Aether app. Help with career advice, explain app features, and guide skill development. Focus on Software Development, Product Management, Data Analysis, IT Support, UX/UI Design careers. Keep answers concise, professional, and encouraging.",
+        // No system instruction as it's causing API errors
       });
 
-      // Add personalized context to the first message if available
+      // Instead of system instructions, we'll inject instructions into the first message
+      // if this is the first message in the conversation
       let enhancedMessage = message;
+      
+      // Check if this is the first message (no history)
+      const isFirstMessage = !formattedHistory.length;
+      
+      if (isFirstMessage) {
+        // Add AI instructions to the first message
+        enhancedMessage = `You are A1, a career advisor for the Aether app. Help with career advice, explain app features, and guide skill development. Focus on Software Development, Product Management, Data Analysis, IT Support, UX/UI Design careers. Keep answers concise, professional, and encouraging.
+
+Now, please respond to this user message: ${message}`;
+      }
+      
+      // Add personalized context if applicable
       if (personalityMsg || careerMsg) {
         // Only add personalization if this appears to be a career-related question
         const careerKeywords = ['career', 'job', 'profession', 'work', 'occupation', 'field', 'industry'];
@@ -1274,7 +1287,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message.toLowerCase().includes(keyword));
           
         if (containsCareerKeyword) {
-          enhancedMessage = `${message}\n\nAdditional context: ${personalityMsg}${careerMsg}`;
+          // If it's the first message, we already have our instructions
+          // Otherwise, add the context directly
+          if (isFirstMessage) {
+            enhancedMessage = `You are A1, a career advisor for the Aether app. Help with career advice, explain app features, and guide skill development. Focus on Software Development, Product Management, Data Analysis, IT Support, UX/UI Design careers. Keep answers concise, professional, and encouraging.
+
+User information: ${personalityMsg}${careerMsg}
+
+Now, please respond to this user message: ${message}`;
+          } else {
+            enhancedMessage = `${message}\n\nAdditional context: ${personalityMsg}${careerMsg}`;
+          }
         }
       }
       
