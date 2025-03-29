@@ -139,8 +139,31 @@ export default function InternshipsScreen({ handleBack, quizResults: initialQuiz
         setIsLoading(true)
         setError(null)
         
-        // First, log the quiz results for debugging
+        // First, verify that we have actual quiz results with meaningful data
+        if (!quizResults || Object.keys(quizResults).length === 0) {
+          setError("Please complete the career assessment quiz before searching for internships.")
+          setIsLoading(false)
+          return
+        }
+        
+        // Log the quiz results for debugging
         console.log("Quiz results for initial search:", quizResults);
+        
+        // Check if we have real quiz data by looking for core components
+        const hasRealQuizData = (
+          (quizResults.primaryType && (
+            typeof quizResults.primaryType === 'object' || 
+            typeof quizResults.primaryType === 'string'
+          )) ||
+          (quizResults.categories && Array.isArray(quizResults.categories) && quizResults.categories.length > 0) ||
+          (quizResults.chartData && Array.isArray(quizResults.chartData) && quizResults.chartData.length > 0)
+        );
+        
+        if (!hasRealQuizData) {
+          setError("Your career assessment data is incomplete. Please retake the quiz for better internship matches.")
+          setIsLoading(false)
+          return
+        }
         
         // Check for primaryType or dominantType before proceeding
         let primaryType = "";
@@ -174,7 +197,6 @@ export default function InternshipsScreen({ handleBack, quizResults: initialQuiz
           }
         }
         
-        // If no primaryType found, try to match career categories without it
         // Match career categories based on quiz results and interests
         const matchedCategories = matchQuizResultsToCategories({
           ...quizResults,
@@ -494,13 +516,33 @@ export default function InternshipsScreen({ handleBack, quizResults: initialQuiz
         // If still no results, prompt the user
         if (!recoveredResults) {
           toast({
-            title: "Incomplete Profile",
-            description: "Please complete your career quiz first to get personalized matches.",
+            title: "Career Quiz Required",
+            description: "Please complete the career assessment quiz first to get personalized matches.",
             variant: "destructive"
           });
           setIsAIMatching(false);
           return;
         }
+      }
+      
+      // Check if we have real quiz data with meaningful content
+      const hasRealQuizData = (
+        (quizResults.primaryType && (
+          typeof quizResults.primaryType === 'object' || 
+          typeof quizResults.primaryType === 'string'
+        )) ||
+        (quizResults.categories && Array.isArray(quizResults.categories) && quizResults.categories.length > 0) ||
+        (quizResults.chartData && Array.isArray(quizResults.chartData) && quizResults.chartData.length > 0)
+      );
+      
+      if (!hasRealQuizData) {
+        toast({
+          title: "Invalid Quiz Data",
+          description: "Your quiz data appears to be incomplete. Please retake the career assessment quiz.",
+          variant: "destructive"
+        });
+        setIsAIMatching(false);
+        return;
       }
       
       // Extract primary personality type from quiz results using all possible structures

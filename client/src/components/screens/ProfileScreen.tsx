@@ -99,36 +99,34 @@ export default function ProfileScreen({
   const strengths: string[] = []
   const weaknesses: string[] = []
   
-  // Add recommended careers as strengths if they exist
-  if (quizResults?.primaryType?.careers) {
-    strengths.push(...quizResults.primaryType.careers.slice(0, 3).map((career: string) => `Suitable for: ${career}`))
-  }
-  
-  // Add hybrid careers as strengths if they exist
-  if (quizResults?.hybridCareers) {
-    strengths.push(...quizResults.hybridCareers.slice(0, 2).map((career: string) => `Potential path: ${career}`))
-  }
-  
-  // Add secondary dimension as a developmental area
-  if (quizResults?.secondaryType) {
-    weaknesses.push(`Develop ${quizResults.secondaryType.name} skills further`)
-    
-    // Add some secondary careers as areas to develop
-    if (quizResults.secondaryType.careers) {
-      weaknesses.push(...quizResults.secondaryType.careers
-        .slice(0, 2)
-        .map((career: string) => `Consider exploring: ${career}`))
+  // Only generate strengths and weaknesses if we have actual quiz results
+  if (quizResults && quizResults.primaryType) {
+    // Add recommended careers as strengths if they exist
+    if (quizResults.primaryType.careers) {
+      strengths.push(...quizResults.primaryType.careers.slice(0, 3).map((career: string) => `Suitable for: ${career}`))
     }
-  }
-  
-  // Add some generic development areas if we don't have any
-  if (weaknesses.length === 0) {
-    weaknesses.push("Take the assessment to discover areas for growth")
-  }
-  
-  // Add generic strengths if we don't have any
-  if (strengths.length === 0) {
-    strengths.push("Complete the career assessment to reveal your strengths")
+    
+    // Add hybrid careers as strengths if they exist
+    if (quizResults.hybridCareers) {
+      strengths.push(...quizResults.hybridCareers.slice(0, 2).map((career: string) => `Potential path: ${career}`))
+    }
+    
+    // Add primary type strengths if explicitly provided
+    if (quizResults.strengths && Array.isArray(quizResults.strengths)) {
+      strengths.push(...quizResults.strengths.slice(0, 3))
+    }
+    
+    // Add secondary dimension as a developmental area
+    if (quizResults.secondaryType) {
+      weaknesses.push(`Develop ${quizResults.secondaryType.name} skills further`)
+      
+      // Add some secondary careers as areas to develop
+      if (quizResults.secondaryType.careers) {
+        weaknesses.push(...quizResults.secondaryType.careers
+          .slice(0, 2)
+          .map((career: string) => `Consider exploring: ${career}`))
+      }
+    }
   }
 
   const handleSaveBio = () => {
@@ -239,54 +237,61 @@ export default function ProfileScreen({
         <div className="bg-white rounded-xl shadow-md p-5 mb-6">
           <h3 className="font-bold mb-2">Personality Analysis</h3>
           
-          <div className="bg-blue-50 rounded-lg p-4 mb-4">
-            <h4 className="text-lg font-bold text-blue-800">{personalityType}</h4>
-            <p className="text-sm text-blue-700">{description}</p>
-          </div>
-          
-          {quizResults && (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <h4 className="font-medium text-green-700 mb-2">Strengths</h4>
-                <ul className="text-sm space-y-1">
-                  {strengths.map((strength: string, index: number) => (
-                    <li key={index} className="flex items-center">
-                      <svg className="w-4 h-4 text-green-500 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                      </svg>
-                      {strength}
-                    </li>
-                  ))}
-                </ul>
+          {/* Only show personality analysis when quizResults actually exist and contain real data */}
+          {quizResults && quizResults.primaryType ? (
+            <>
+              <div className="bg-blue-50 rounded-lg p-4 mb-4">
+                <h4 className="text-lg font-bold text-blue-800">{personalityType}</h4>
+                <p className="text-sm text-blue-700">{description}</p>
               </div>
               
-              <div>
-                <h4 className="font-medium text-red-700 mb-2">Areas to Improve</h4>
-                <ul className="text-sm space-y-1">
-                  {weaknesses.map((weakness: string, index: number) => (
-                    <li key={index} className="flex items-center">
-                      <svg className="w-4 h-4 text-red-500 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                      </svg>
-                      {weakness}
-                    </li>
-                  ))}
-                </ul>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-medium text-green-700 mb-2">Strengths</h4>
+                  <ul className="text-sm space-y-1">
+                    {strengths.map((strength: string, index: number) => (
+                      <li key={index} className="flex items-center">
+                        <svg className="w-4 h-4 text-green-500 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        {strength}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                
+                <div>
+                  <h4 className="font-medium text-red-700 mb-2">Areas to Improve</h4>
+                  <ul className="text-sm space-y-1">
+                    {weaknesses.map((weakness: string, index: number) => (
+                      <li key={index} className="flex items-center">
+                        <svg className="w-4 h-4 text-red-500 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                        {weakness}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
-            </div>
+            </>
+          ) : (
+            <>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                <h4 className="text-lg font-semibold text-amber-800">No Personality Analysis Available</h4>
+                <p className="text-sm text-amber-700 mb-3">
+                  You haven't completed the career personality quiz yet. Take the quiz to discover your strengths, 
+                  areas for improvement, and get personalized career recommendations.
+                </p>
+                <Button
+                  className="bg-amber-500 hover:bg-amber-600 text-white"
+                  onClick={() => navigateTo("quiz")}
+                >
+                  Take the Career Quiz
+                </Button>
+              </div>
+            </>
           )}
-          
-          {!quizResults && (
-            <div className="text-center py-4">
-              <Button
-                className="bg-green-500 hover:bg-green-600"
-                onClick={() => handleBack()}
-              >
-                Take the Quiz
-              </Button>
-            </div>
-          )}
-          
         </div>
 
         {/* Account Settings */}
