@@ -354,12 +354,24 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
         personalityType: primaryType
       };
       
-      // Call the new AI-powered match endpoint
+      // Get career suggestions based on quiz results
+      const matchedCategories = matchQuizResultsToCategories({
+        ...quizResults,
+        interests: interests
+      });
+      
+      // Extract job titles and keywords for better matching
+      const { jobTitles, keywords } = getJobSearchTerms(matchedCategories);
+      
+      console.log('Using personalized match parameters:', { jobTitles, keywords });
+      
+      // Call the AI-powered match endpoint with personalized parameters
       const response = await apiRequest('POST', '/api/internships/match', {
         userProfile,
         quizResults,
-        jobTitles: [],
-        keywords: [],
+        jobTitles,
+        keywords,
+        isPersonalizedMatch: true,
         limit: 20
       });
       

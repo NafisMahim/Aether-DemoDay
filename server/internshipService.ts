@@ -549,13 +549,30 @@ export async function generateInternshipRecommendations(
 export async function findInternships(
   jobTitles: string[] = [],
   keywords: string[] = [],
-  limit: number = 10
+  limit: number = 10,
+  isPersonalizedMatch: boolean = false
 ): Promise<{ rapidapi?: InternshipSearchResult[], remotive: InternshipSearchResult[], google?: any[] }> {
   try {
+    // Log input parameters for debugging
+    console.log('Internship search parameters:', {
+      jobTitles,
+      keywords,
+      isPersonalizedMatch: !!isPersonalizedMatch
+    });
+    
     // Combine job titles and keywords for search, ensuring uniqueness
     const combinedTerms = [...jobTitles, ...keywords];
     const searchTermsSet = new Set<string>();
-    combinedTerms.forEach(term => searchTermsSet.add(term));
+    
+    // Prioritize job titles if this is a personalized AI match
+    if (isPersonalizedMatch && jobTitles.length > 0) {
+      // Only use job titles when it's a personalized match from quiz results
+      jobTitles.forEach(term => searchTermsSet.add(term));
+    } else {
+      // Otherwise use all available search terms
+      combinedTerms.forEach(term => searchTermsSet.add(term));
+    }
+    
     const searchTerms = Array.from(searchTermsSet);
     
     // If no search terms, use some defaults

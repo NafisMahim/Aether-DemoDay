@@ -152,7 +152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      const { userProfile, quizResults, jobTitles, keywords, limit } = req.body;
+      const { userProfile, quizResults, jobTitles, keywords, limit, isPersonalizedMatch } = req.body;
       
       if (!quizResults || !quizResults.primaryType) {
         return res.status(400).json({
@@ -163,11 +163,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log('Starting internship matching with AI...');
       
-      // First, find internships based on categories from quiz results
-      const careerCategories = quizResults.primaryType.careers || [];
-      const searchTerms = [...(jobTitles || []), ...(keywords || []), ...careerCategories];
+      // Log the received parameters for debugging
+      console.log('Internship search parameters:', {
+        jobTitles: jobTitles || [],
+        keywords: keywords || [],
+        isPersonalizedMatch: !!isPersonalizedMatch
+      });
       
-      // Get a reasonable set of search terms to use
+      // Get career categories from quiz results
+      const careerCategories = quizResults.primaryType.careers || [];
+      
+      // If isPersonalizedMatch is true, prioritize the job titles sent from the client
+      // which are derived from the matchQuizResultsToCategories function
+      let searchTerms = [];
+      
+      if (isPersonalizedMatch && Array.isArray(jobTitles) && jobTitles.length > 0) {
+        // Use the career-mapped job titles from client as priority search terms
+        searchTerms = [...jobTitles];
+        console.log('Using personalized job titles from quiz results mapping:', jobTitles);
+      } else {
+        // Fallback to combining all available terms
+        searchTerms = [...(jobTitles || []), ...(keywords || []), ...careerCategories];
+        console.log('Using combined search terms from all sources');
+      }
+      
+      // Get a reasonable set of search terms to use (limit to 5 for API efficiency)
       const uniqueTerms = Array.from(new Set(searchTerms)).slice(0, 5);
       console.log('Searching for internships matching these career categories:', uniqueTerms);
       
@@ -175,7 +195,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const internships = await findInternships(
         uniqueTerms,
         [],
-        limit || 10
+        limit || 10,
+        isPersonalizedMatch
       );
       
       // Use Gemini AI to match internships to the user's profile
@@ -220,7 +241,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         results = await findInternships(
           searchTerms,
           searchTerms,
-          limit || 10
+          limit || 10,
+          false // This is a direct search, not a personalized match
         );
       } 
       // For profile-based or AI personalized matches
@@ -236,7 +258,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         results = await findInternships(
           jobTitles || [], 
           keywords || [],
-          limit || 10
+          limit || 10,
+          isPersonalizedMatch
         );
       } else {
         return res.status(400).json({ 
