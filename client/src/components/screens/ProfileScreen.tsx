@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
@@ -15,7 +15,16 @@ interface ProfileScreenProps {
   profileImage?: string
 }
 
-export default function ProfileScreen({ handleBack, username, quizResults: initialQuizResults, bio, onLogout, navigateTo = () => {}, onBioChange, profileImage }: ProfileScreenProps) {
+export default function ProfileScreen({ 
+  handleBack, 
+  username, 
+  quizResults: initialQuizResults, 
+  bio, 
+  onLogout, 
+  navigateTo = () => {}, 
+  onBioChange, 
+  profileImage 
+}: ProfileScreenProps) {
   const { toast } = useToast()
   const [isEditing, setIsEditing] = useState(false)
   const [editedBio, setEditedBio] = useState(bio)
@@ -26,6 +35,7 @@ export default function ProfileScreen({ handleBack, username, quizResults: initi
   
   // Try to load quiz results if not provided or empty
   useEffect(() => {
+    // If we don't have quiz results, try to get them from various sources
     if (!quizResults || Object.keys(quizResults).length === 0) {
       console.log("Attempting to restore quiz results in ProfileScreen");
       
@@ -79,15 +89,15 @@ export default function ProfileScreen({ handleBack, username, quizResults: initi
         console.error("Error fetching quiz results from server:", error);
       });
     }
-  }, [quizResults]);
+  }, []);  // Empty dependency array - run only once
 
   // Extract quiz result data with more precise fallbacks
   const personalityType = quizResults?.primaryType?.name || quizResults?.personalityType || "Take a quiz to discover your type"
   const description = quizResults?.primaryType?.description || quizResults?.description || "Your personality analysis will appear here after completing a quiz."
   
   // Generate strengths and areas to improve from the quiz data
-  const strengths = []
-  const weaknesses = []
+  const strengths: string[] = []
+  const weaknesses: string[] = []
   
   // Add recommended careers as strengths if they exist
   if (quizResults?.primaryType?.careers) {
@@ -277,7 +287,6 @@ export default function ProfileScreen({ handleBack, username, quizResults: initi
             </div>
           )}
           
-
         </div>
 
         {/* Account Settings */}
