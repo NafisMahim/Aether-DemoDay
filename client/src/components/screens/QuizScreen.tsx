@@ -403,45 +403,33 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
     }
     
     try {
-      console.log("Saving quiz results:", {
-        results,
+      // Prepare quiz results data
+      const quizData = {
+        primaryType: {
+          name: results.primaryType?.name || '',
+          score: results.primaryType?.score || 0,
+          description: results.primaryType?.description || '',
+          careers: results.primaryType?.careers || []
+        },
+        secondaryType: {
+          name: results.secondaryType?.name || '',
+          score: results.secondaryType?.score || 0,
+          description: results.secondaryType?.description || '',
+          careers: results.secondaryType?.careers || []
+        },
+        categories: results.categories || [],
+        hybridCareers: results.hybridCareers || [],
+        dominantType: results.primaryType?.name || '',
         analysis: analysisResult,
         summary: careerSummary,
-        date: new Date().toISOString()
-      })
-      
-      // Check authentication status first
-      const authStatusResponse = await fetch('/api/auth/status')
-      const authData = await authStatusResponse.json()
-      
-      if (!authData.isAuthenticated) {
-        toast({
-          title: "Authentication Required",
-          description: "Please log in first to save results to your profile.",
-          variant: "destructive",
-        })
-        // Still return results to the home screen
-        handleBack(results)
-        return
+        savedAt: new Date().toISOString()
       }
       
+      console.log("Saving quiz results:", quizData)
+      
       try {
-        // Save quiz results to user profile
-        const response = await fetch('/api/user/quiz-results', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            results,
-            analysis: analysisResult,
-            summary: careerSummary,
-            date: new Date().toISOString()
-          }),
-          credentials: 'include'
-        })
-        
-        console.log("API response status:", response.status)
+        // Save quiz results to the database via new API endpoint
+        const response = await apiRequest('POST', '/api/quiz/results', quizData)
         
         if (response.ok) {
           const responseData = await response.json()
@@ -451,7 +439,22 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
             title: "Success!",
             description: "Your assessment results have been saved to your profile.",
           })
+          
+          // Pass results back to the home screen
+          handleBack(results)
         } else {
+          // If response is 401 Unauthorized, we need to inform the user
+          if (response.status === 401) {
+            toast({
+              title: "Authentication Required",
+              description: "Please log in first to save results to your profile.",
+              variant: "destructive",
+            })
+            // Still return results to the home screen
+            handleBack(results)
+            return
+          }
+          
           const errorData = await response.text()
           console.error("Error response:", errorData)
           
@@ -460,6 +463,9 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
             description: "Failed to save results to your profile. Please try again.",
             variant: "destructive",
           })
+          
+          // Return to home with results anyway
+          handleBack(results)
         }
       } catch (apiError) {
         console.error("API call error:", apiError)
@@ -468,6 +474,9 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
           description: "Could not connect to the server. Please try again later.",
           variant: "destructive",
         })
+        
+        // Return to home with results anyway
+        handleBack(results)
       }
     } catch (error) {
       console.error("Error in handleViewDetails:", error)

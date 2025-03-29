@@ -521,6 +521,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Save quiz results
+  app.post('/api/quiz/results', ensureAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const quizData = req.body;
+      
+      if (!quizData || !quizData.primaryType) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Invalid quiz data. Primary personality type is required." 
+        });
+      }
+      
+      console.log('Saving quiz results for user:', userId);
+      
+      const updatedUser = await storage.saveQuizResults(userId, quizData);
+      if (!updatedUser) {
+        return res.status(404).json({
+          success: false,
+          message: "Failed to save quiz results. User not found."
+        });
+      }
+      
+      return res.status(200).json({
+        success: true,
+        message: "Quiz results saved successfully",
+        user: getSafeUserData(updatedUser)
+      });
+    } catch (error) {
+      console.error('Error saving quiz results:', error);
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+  
+  // Get quiz results
+  app.get('/api/quiz/results', ensureAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const quizResults = await storage.getQuizResults(userId);
+      
+      if (!quizResults) {
+        return res.status(404).json({
+          success: false, 
+          message: "No quiz results found for this user."
+        });
+      }
+      
+      return res.status(200).json({
+        success: true,
+        results: quizResults
+      });
+    } catch (error) {
+      console.error('Error retrieving quiz results:', error);
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+  
   // Update user profile
   app.patch('/api/users/:id', ensureAuthenticated, async (req, res) => {
     try {

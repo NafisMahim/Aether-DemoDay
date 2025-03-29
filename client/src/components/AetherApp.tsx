@@ -83,6 +83,28 @@ export default function AetherApp() {
             profileImage: data.user.profileImage || "",
             interests: userData.interests // Keep default interests for now
           })
+          
+          // Fetch quiz results from API if user is authenticated
+          try {
+            const quizResponse = await fetch('/api/quiz/results', {
+              credentials: 'include'
+            })
+            
+            if (quizResponse.ok) {
+              const quizData = await quizResponse.json()
+              console.log('Retrieved quiz results from server:', quizData)
+              
+              if (quizData.success && quizData.results) {
+                setQuizResults(quizData.results)
+              }
+            } else if (quizResponse.status !== 404) {
+              // Don't log 404s as errors since it's normal for new users
+              console.error('Error fetching quiz results:', quizResponse.status)
+            }
+          } catch (quizError) {
+            console.error('Error fetching quiz results:', quizError)
+          }
+          
           setCurrentScreen("home")
         }
       } catch (error) {
@@ -101,16 +123,42 @@ export default function AetherApp() {
       const response = await apiRequest("POST", "/api/login", credentials)
       return response.json()
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       if (data.user) {
         setUser(data.user)
-        setCurrentScreen("home")
         setErrorMessage("")
+        
+        // Update user data
         setUserData({
           ...userData, 
           name: data.user.displayName || data.user.username,
+          bio: data.user.bio || userData.bio,
           profileImage: data.user.profileImage || ""
         })
+        
+        // Fetch quiz results if they exist
+        try {
+          const quizResponse = await fetch('/api/quiz/results', {
+            credentials: 'include'
+          })
+          
+          if (quizResponse.ok) {
+            const quizData = await quizResponse.json()
+            console.log('Retrieved quiz results after login:', quizData)
+            
+            if (quizData.success && quizData.results) {
+              setQuizResults(quizData.results)
+            }
+          } else if (quizResponse.status !== 404) {
+            // 404 is expected for users without quiz results
+            console.error('Error fetching quiz results after login:', quizResponse.status)
+          }
+        } catch (quizError) {
+          console.error('Error fetching quiz results after login:', quizError)
+        }
+        
+        setCurrentScreen("home")
+        
         toast({
           title: "Login successful",
           description: `Welcome back, ${data.user.displayName || data.user.username}!`,
@@ -133,16 +181,40 @@ export default function AetherApp() {
       const response = await apiRequest("POST", "/api/register", userData)
       return response.json()
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       if (data.user) {
         setUser(data.user)
-        setCurrentScreen("home")
         setErrorMessage("")
+        
+        // Update user data
         setUserData({
           ...userData,
           name: data.user.displayName || data.user.username,
+          bio: data.user.bio || userData.bio,
           profileImage: data.user.profileImage || ""
         })
+        
+        // For new users, there's usually no quiz results yet, but check anyway
+        try {
+          const quizResponse = await fetch('/api/quiz/results', {
+            credentials: 'include'
+          })
+          
+          if (quizResponse.ok) {
+            const quizData = await quizResponse.json()
+            console.log('Retrieved quiz results after signup:', quizData)
+            
+            if (quizData.success && quizData.results) {
+              setQuizResults(quizData.results)
+            }
+          }
+        } catch (quizError) {
+          // Silently fail since new users won't have quiz results
+          console.log('No quiz results for new user (expected)')
+        }
+        
+        setCurrentScreen("home")
+        
         toast({
           title: "Account created",
           description: `Welcome to Aether, ${data.user.displayName || data.user.username}!`,
