@@ -29,66 +29,93 @@ export async function searchRapidAPIInternships(
         throw new Error(`RapidAPI returned status ${response.status}`);
       }
       
-      console.log(`RapidAPI response status: ${response.status}, found ${Array.isArray(response.data) ? response.data.length : 0} internships`);
-      
       // Transform the RapidAPI response to match our InternshipSearchResult format
       const allInternships = response.data;
-      const results: InternshipSearchResult[] = [];
       
       if (!Array.isArray(allInternships)) {
         console.error("RapidAPI error: Response is not an array", typeof allInternships);
         throw new Error("RapidAPI response is not an array");
       }
       
+      console.log(`RapidAPI response status: ${response.status}, found ${allInternships.length} internships`);
+      
       // Log sample data
       if (allInternships.length > 0) {
         console.log("RapidAPI sample data:", JSON.stringify(allInternships[0]).substring(0, 300) + "...");
       }
+
+      // Extract and normalize job fields for better matching
+      const normalizedJobs = allInternships.map((job: any) => {
+        // Create a composite search text to make matching more effective
+        const searchText = [
+          job.title || '',
+          job.organization || '',
+          job.description || '',
+          ...(job.locations_raw?.map((loc: any) => loc.name || '') || []),
+          ...(job.skills || []),
+          ...(job.categories || [])
+        ].join(' ').toLowerCase();
+
+        return {
+          raw: job,
+          searchText
+        };
+      });
       
-      // Group internships by search term categories
+      const results: InternshipSearchResult[] = [];
+      
+      // Process each search term
       for (const term of searchTerms) {
         const termLower = term.toLowerCase();
+        const termWords = termLower.split(/\s+/);
         
-        // Filter internships relevant to this search term
-        const relevantJobs = allInternships.filter((internship: any) => {
-          const title = ((internship.title || '') + '').toLowerCase();
-          const company = ((internship.company || '') + '').toLowerCase();
-          const description = ((internship.description || '') + '').toLowerCase();
-          
-          return (
-            title.includes(termLower) || 
-            description.includes(termLower) ||
-            company.includes(termLower)
-          );
+        // Find relevant internships for this term
+        // We'll match if ANY word in the search term is found in the searchText
+        const relevantJobs = normalizedJobs.filter(job => {
+          // Consider a match if ANY word in the search term appears in the searchText
+          return termWords.some(word => job.searchText.includes(word));
         });
         
         console.log(`RapidAPI: Found ${relevantJobs.length} internships for search term "${term}"`);
         
-        // Map to our Internship format
-        const mappedJobs = relevantJobs.map((internship: any) => ({
-          id: `rapidapi-${internship.id || Math.random().toString(36).substring(2, 11)}`,
-          title: internship.title || 'Internship Opportunity',
-          company_name: internship.company || 'Unknown Company',
-          company_logo: internship.logo || `https://logo.clearbit.com/${(internship.company || 'company').toLowerCase().replace(/[^a-z0-9]/g, '')}.com`,
-          url: internship.url || '#',
-          category: internship.category || term,
-          tags: internship.tags || [term.toLowerCase(), 'internship', 'entry-level'],
-          job_type: 'internship',
-          publication_date: internship.posted_date || new Date().toISOString(),
-          candidate_required_location: internship.location || 'Remote',
-          salary: internship.salary || 'Competitive',
-          description: internship.description || `Internship opportunity at ${internship.company || 'a company'}`
-        }));
-        
-        if (mappedJobs.length > 0) {
-          results.push({
-            jobs: mappedJobs,
-            source: 'rapidapi',
-            query: term
-          });
+        if (relevantJobs.length === 0) {
+          continue; // Skip this term if no matching jobs
         }
+        
+        // Map to our Internship format
+        const mappedJobs = relevantJobs.map(job => {
+          const internship = job.raw;
+          const organization = internship.organization || 'Unknown Company';
+          const cleanOrgName = organization.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const id = internship.id || Math.random().toString(36).substring(2, 11);
+          
+          return {
+            id: `rapidapi-${id}`,
+            title: internship.title || `${term} Internship Opportunity`,
+            company_name: organization,
+            company_logo: internship.organization_logo || `https://logo.clearbit.com/${cleanOrgName}.com`,
+            url: internship.url || internship.organization_url || '#',
+            category: term,
+            tags: [term.toLowerCase(), 'internship', 'entry-level'],
+            job_type: 'internship',
+            publication_date: internship.date_posted || new Date().toISOString(),
+            candidate_required_location: (internship.locations_raw && internship.locations_raw.length > 0) 
+              ? internship.locations_raw.map((loc: any) => loc.name || '').join(', ')
+              : 'Remote/Various',
+            salary: internship.salary || 'Competitive',
+            description: internship.description || `${term} internship opportunity at ${organization}.`
+          };
+        });
+        
+        // Add to results for this search term
+        results.push({
+          jobs: mappedJobs,
+          source: 'rapidapi',
+          query: term
+        });
       }
       
+      // Return results for all search terms
       return results;
     } catch (error) {
       console.error('Error fetching from RapidAPI:', error);
