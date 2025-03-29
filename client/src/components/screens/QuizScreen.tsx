@@ -489,58 +489,33 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
   const renderPieChart = () => {
     const data = generateCareerData().chartData
     
-    // Custom label renderer that ensures the text fits within the chart
-    const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }: any) => {
-      // Calculate the position for the label
-      const RADIAN = Math.PI / 180;
-      const radius = 25 + innerRadius + (outerRadius - innerRadius);
-      const x = cx + radius * Math.cos(-midAngle * RADIAN);
-      const y = cy + radius * Math.sin(-midAngle * RADIAN);
-      
-      // Short names to ensure they fit
-      const shortNames: Record<string, string> = {
-        "Analytical": "Analy.",
-        "Creative": "Creat.",
-        "Social": "Social",
-        "Practical": "Pract."
-      };
-      
-      // Render a shorter name version
-      return (
-        <text 
-          x={x} 
-          y={y} 
-          fill={data[index].color} 
-          textAnchor={x > cx ? 'start' : 'end'} 
-          dominantBaseline="central"
-          fontWeight="bold"
-          fontSize="12"
-        >
-          {shortNames[name] || name}: {(percent * 100).toFixed(0)}%
-        </text>
-      );
-    };
-    
     return (
-      <ResponsiveContainer width="100%" height={270}>
-        <PieChart margin={{ top: 20, right: 30, left: 30, bottom: 10 }}>
+      <ResponsiveContainer width="100%" height={200}>
+        <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
           <Pie
             data={data}
             cx="50%"
             cy="50%"
-            innerRadius={60}
-            outerRadius={80}
+            innerRadius={40}
+            outerRadius={60}
             paddingAngle={5}
             dataKey="value"
-            labelLine={false}
-            label={renderCustomizedLabel}
+            label={false}
           >
             {data.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={entry.color} />
             ))}
           </Pie>
           <Tooltip formatter={(value) => `${value}%`} />
-          <Legend layout="horizontal" verticalAlign="bottom" align="center" />
+          <Legend 
+            layout="horizontal" 
+            verticalAlign="bottom" 
+            align="center"
+            formatter={(value, entry) => {
+              const { payload } = entry as any;
+              return `${value}: ${payload.value}%`;
+            }}
+          />
         </PieChart>
       </ResponsiveContainer>
     )
