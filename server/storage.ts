@@ -350,36 +350,77 @@ export class DatabaseStorage implements IStorage {
   // Quiz results methods
   async saveQuizResults(userId: number, quizData: any): Promise<User | undefined> {
     try {
+      // First, check if the user exists
+      const existingUser = await this.getUser(userId);
+      if (!existingUser) {
+        console.error(`Cannot save quiz results: User ${userId} not found`);
+        return undefined;
+      }
+      
+      // Log the input data for debugging
+      console.log(`Attempting to save quiz results for user ${userId}`, {
+        dataType: typeof quizData,
+        hasPrimaryType: !!quizData.primaryType,
+        quizDataKeys: Object.keys(quizData)
+      });
+      
+      // Update the user record with the quiz results
       const [updatedUser] = await db
         .update(users)
         .set({
           quizResults: quizData,
-          personalityType: quizData.primaryType?.name || quizData.dominantType
+          personalityType: quizData.primaryType?.name || quizData.dominantType || existingUser.personalityType || "Unknown"
         })
         .where(eq(users.id, userId))
         .returning();
       
-      console.log(`DB: Successfully saved quiz results for user ${userId}`);
+      // Verify the update was successful
+      if (!updatedUser) {
+        console.error(`DB: Quiz results save operation completed but no user was returned for ID ${userId}`);
+        return existingUser; // Return the original user as fallback
+      }
+      
+      console.log(`DB: Successfully saved quiz results for user ${userId}`, {
+        hasResults: !!updatedUser.quizResults,
+        personalityType: updatedUser.personalityType
+      });
+      
       return updatedUser;
     } catch (error) {
-      console.error(`DB: Error saving quiz results:`, error);
+      console.error(`DB: Error saving quiz results for user ${userId}:`, error);
       return undefined;
     }
   }
 
   async getQuizResults(userId: number): Promise<any | null> {
-    const [user] = await db
-      .select({ quizResults: users.quizResults })
-      .from(users)
-      .where(eq(users.id, userId));
-    
-    if (!user || !user.quizResults) {
-      console.log(`DB: No quiz results found for user ${userId}`);
+    try {
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, userId));
+      
+      if (!user) {
+        console.log(`DB: User ${userId} not found when retrieving quiz results`);
+        return null;
+      }
+      
+      if (!user.quizResults) {
+        console.log(`DB: No quiz results found for user ${userId}`);
+        return null;
+      }
+      
+      // Log successful retrieval
+      console.log(`DB: Successfully retrieved quiz results for user ${userId}`, {
+        resultType: typeof user.quizResults,
+        hasResults: !!user.quizResults,
+        personalityType: user.personalityType
+      });
+      
+      return user.quizResults;
+    } catch (error) {
+      console.error(`DB: Error retrieving quiz results for user ${userId}:`, error);
       return null;
     }
-    
-    console.log(`DB: Retrieved quiz results for user ${userId}`);
-    return user.quizResults;
   }
 
   // Interest methods

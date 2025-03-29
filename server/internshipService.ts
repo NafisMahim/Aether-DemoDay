@@ -404,14 +404,30 @@ export async function generateInternshipRecommendations(
       strengths = [...strengths, ...quizResults.strengths];
     }
     
-    // Get recommended careers from quiz results was gathered earlier in primaryCareers 
-    // No need to gather again, already available in primaryCareers
+    // Extract recommended careers from quiz results
+    const recommendedCareers: string[] = [];
+    
+    // Get career recommendations from quiz results
+    if (quizResults.primaryType?.careers && Array.isArray(quizResults.primaryType.careers)) {
+      recommendedCareers.push(...quizResults.primaryType.careers);
+    }
+    
+    if (quizResults.secondaryType?.careers && Array.isArray(quizResults.secondaryType.careers)) {
+      recommendedCareers.push(...quizResults.secondaryType.careers);
+    }
+    
+    if (quizResults.hybridCareers && Array.isArray(quizResults.hybridCareers)) {
+      recommendedCareers.push(...quizResults.hybridCareers);
+    }
+    
+    // Deduplicate careers
+    const uniqueCareers = [...new Set(recommendedCareers)];
     
     console.log("Personality profile for internship matching:", {
       primaryType,
       secondaryType,
       strengths: strengths.length > 0 ? strengths.slice(0, 3) : ["No specific strengths found"],
-      recommendedCareers: primaryCareers.length > 0 ? primaryCareers.slice(0, 5) : ["No specific careers found"],
+      recommendedCareers: uniqueCareers.length > 0 ? uniqueCareers.slice(0, 5) : ["No specific careers found"],
       interests: userProfile.interests?.length || 0
     });
     
@@ -495,14 +511,14 @@ export async function generateInternshipRecommendations(
     // Extract career interests and strengths from quiz results
     const primaryCareerType = quizResults?.primaryType?.name || "Unknown";
     const secondaryCareerType = quizResults?.secondaryType?.name || "Unknown";
-    const primaryCareers = quizResults?.primaryType?.careers || [];
+    const careerOptions = quizResults?.primaryType?.careers || [];
     
     // Combine interests from both profile and quiz
     const interests = [
       ...(userProfile?.interests || []).map((i: any) => i.category),
       primaryCareerType,
       secondaryCareerType,
-      ...primaryCareers
+      ...careerOptions
     ];
     
     // Format the prompt for Gemini
@@ -511,7 +527,7 @@ export async function generateInternshipRecommendations(
       
       STUDENT PROFILE:
       Career Type: ${primaryCareerType} (primary), ${secondaryCareerType} (secondary)
-      Recommended Careers: ${primaryCareers.join(', ')}
+      Recommended Careers: ${careerOptions.join(', ')}
       Interests: ${interests.join(', ')}
       
       AVAILABLE INTERNSHIPS:
