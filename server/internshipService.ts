@@ -154,6 +154,79 @@ export interface InternshipSearchResult {
 }
 
 /**
+ * Fetch internships from Adzuna API
+ * @param searchTerms Array of search terms to query for
+ * @param limit Maximum number of results to return
+ * @returns Promise resolving to array of internship results
+ */
+export async function searchAdzunaInternships(
+  searchTerms: string[],
+  limit: number = 10
+): Promise<InternshipSearchResult[]> {
+  try {
+    console.log('Searching for internships on Adzuna API...');
+    const appId = "89757946";
+    const appKey = "3ad2e76b6089b47e16ac29c52d5c7df0";
+    
+    const results: InternshipSearchResult[] = [];
+    
+    // Process each search term in parallel
+    const searchPromises = searchTerms.map(async (term) => {
+      try {
+        // Create search query combining "intern" with the specific term
+        const whatQuery = encodeURIComponent(`intern ${term}`);
+        const url = `https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=${appId}&app_key=${appKey}&what=${whatQuery}&where=remote&results_per_page=${limit}`;
+        
+        console.log(`Adzuna: Searching for "${term}" internships`);
+        const response = await axios.get(url);
+        
+        if (response.status === 200 && response.data && response.data.results) {
+          // Transform the results to match our RemotiveJob format for consistency
+          const jobs = response.data.results.map((job: any) => ({
+            id: job.id || `adzuna-${Math.random().toString(36).substring(2, 15)}`,
+            url: job.redirect_url,
+            title: job.title,
+            company_name: job.company.display_name,
+            company_logo: "", // Adzuna doesn't provide logos
+            category: job.category.label || "Internship",
+            tags: [job.category.label],
+            job_type: "full_time",
+            publication_date: job.created,
+            candidate_required_location: job.location.display_name || "Remote",
+            salary: job.salary_is_predicted ? `${job.salary_min}-${job.salary_max}` : "Unspecified",
+            description: job.description || "No description available",
+            source: "adzuna"
+          }));
+          
+          console.log(`Adzuna: Found ${jobs.length} internships for search term "${term}"`);
+          
+          return {
+            jobs,
+            source: 'adzuna',
+            query: term
+          };
+        } else {
+          console.error(`Adzuna API returned invalid response for term "${term}":`, response.status);
+          return null;
+        }
+      } catch (error) {
+        console.error(`Error fetching Adzuna internships for term "${term}":`, error);
+        return null;
+      }
+    });
+    
+    // Wait for all search results and filter out any failed searches
+    const searchResults = await Promise.all(searchPromises);
+    const validResults = searchResults.filter(Boolean) as InternshipSearchResult[];
+    
+    return validResults;
+  } catch (error) {
+    console.error('Error in searchAdzunaInternships:', error);
+    return [];
+  }
+}
+
+/**
  * Fetch internships from Remotive API
  * @param searchTerms Array of search terms to query for
  * @returns Promise resolving to array of internship results
@@ -448,7 +521,28 @@ export async function generateInternshipRecommendations(
               id: job.id,
               url: job.url,
               location: job.candidate_required_location,
-              category: category.query
+              category: category.query,
+              source: 'rapidapi'
+            };
+          });
+        }
+      });
+    }
+    
+    // Process Adzuna results
+    if (internships.adzuna) {
+      internships.adzuna.forEach((category: any) => {
+        if (category.jobs && Array.isArray(category.jobs)) {
+          category.jobs.forEach((job: any) => {
+            allInternshipTitles.push(job.title);
+            internshipDetails[job.title] = {
+              company: job.company_name,
+              description: job.description,
+              id: job.id,
+              url: job.url,
+              location: job.candidate_required_location || 'Remote',
+              category: category.query,
+              source: 'adzuna'
             };
           });
         }
@@ -467,7 +561,8 @@ export async function generateInternshipRecommendations(
               id: job.id,
               url: job.url,
               location: job.candidate_required_location,
-              category: category.query
+              category: category.query,
+              source: 'remotive'
             };
           });
         }
@@ -486,7 +581,8 @@ export async function generateInternshipRecommendations(
               id: job.id,
               url: job.url,
               location: job.candidate_required_location || "Location not specified",
-              category: category.query
+              category: category.query,
+              source: 'google'
             };
           });
         }
@@ -534,7 +630,7 @@ export async function generateInternshipRecommendations(
       AVAILABLE INTERNSHIPS:
       ${allInternshipTitles.slice(0, 15).map((title, idx) => {
         const details = internshipDetails[title];
-        return `${idx+1}. ${title} at ${details.company}\n   ${details.description?.slice(0, 100)}...`;
+        return `${idx+1}. ${title} at ${details.company} [Source: ${details.source}]\n   ${details.description?.slice(0, 100)}...`;
       }).join('\n\n')}
       
       TASKS:
@@ -542,7 +638,8 @@ export async function generateInternshipRecommendations(
       2. Select the 3-5 best matching internships based on career alignment.
       3. Provide a BRIEF explanation of why these are good matches (max 2 sentences per match).
       4. For each internship, add a match percentage (e.g., "Match: 85%").
-      5. Format your response as a JSON object with these fields:
+      5. Try to include diverse sources (RapidAPI, Adzuna, Remotive, Google) in your recommendations.
+      6. Format your response as a JSON object with these fields:
          - recommendations: A concise paragraph (max 3 sentences) summarizing the matches
          - topMatches: Array of internship titles that are the best matches
          - matchScores: Object mapping internship titles to match percentages (numbers between 0-100)
@@ -603,7 +700,7 @@ export async function findInternships(
   keywords: string[] = [],
   limit: number = 10,
   isPersonalizedMatch: boolean = false
-): Promise<{ rapidapi?: InternshipSearchResult[], remotive: InternshipSearchResult[], google?: any[] }> {
+): Promise<{ rapidapi?: InternshipSearchResult[], adzuna?: InternshipSearchResult[], remotive: InternshipSearchResult[], google?: any[] }> {
   try {
     // Log input parameters for debugging
     console.log('Internship search parameters:', {
@@ -660,12 +757,38 @@ export async function findInternships(
       console.log('Will try fallback sources...');
     }
     
-    // If RapidAPI didn't return results, try Remotive as first fallback
+    // If RapidAPI didn't return results, try Adzuna as the first fallback
+    let adzunaResults: InternshipSearchResult[] = [];
+    let hasAdzunaResults = false;
+    
+    if (!hasRapidApiResults) {
+      console.log('No results from RapidAPI, falling back to Adzuna API...');
+      
+      try {
+        adzunaResults = await searchAdzunaInternships(limitedTerms, limit);
+        
+        hasAdzunaResults = adzunaResults.some(result => 
+          result.source === 'adzuna' && result.jobs && result.jobs.length > 0
+        );
+        
+        console.log('Adzuna internship search complete. Success:', hasAdzunaResults);
+        console.log('Adzuna results breakdown:', adzunaResults.map(r => ({
+          source: r.source,
+          query: r.query,
+          jobCount: r.jobs?.length || 0
+        })));
+      } catch (adzunaError) {
+        console.error('Error with Adzuna internship search:', adzunaError);
+        console.log('Will try next fallback source...');
+      }
+    }
+    
+    // If neither RapidAPI nor Adzuna returned results, try Remotive as second fallback
     let remotiveResults: InternshipSearchResult[] = [];
     let hasRealRemotiveResults = false;
     
-    if (!hasRapidApiResults) {
-      console.log('No results from RapidAPI, falling back to Remotive...');
+    if (!hasRapidApiResults && !hasAdzunaResults) {
+      console.log('No results from RapidAPI or Adzuna, falling back to Remotive...');
       
       remotiveResults = await searchRemotiveInternships(limitedTerms, limit);
       
@@ -679,13 +802,16 @@ export async function findInternships(
         query: r.query,
         jobCount: r.jobs?.length || 0
       })));
+    } else if (!hasRapidApiResults) {
+      // Still get Remotive results as a backup even if Adzuna worked
+      remotiveResults = await searchRemotiveInternships(limitedTerms, limit);
     }
     
-    // If neither RapidAPI nor Remotive returned real results, try Google as final fallback
+    // If none of the primary APIs returned real results, try Google as final fallback
     let googleResults = null;
     
-    if (!hasRapidApiResults && !hasRealRemotiveResults) {
-      console.log('No real results from either RapidAPI or Remotive, falling back to Google Programmable Search...');
+    if (!hasRapidApiResults && !hasAdzunaResults && !hasRealRemotiveResults) {
+      console.log('No real results from RapidAPI, Adzuna, or Remotive, falling back to Google Programmable Search...');
       
       // Use Google Programmable Search as fallback
       googleResults = await searchGoogleForInternships(limitedTerms, limit);
@@ -698,17 +824,20 @@ export async function findInternships(
     
     // Calculate stats for logs
     const rapidApiJobCount = rapidApiResults?.reduce((total, cat) => total + (cat.jobs?.length || 0), 0) || 0;
+    const adzunaJobCount = adzunaResults?.reduce((total, cat) => total + (cat.jobs?.length || 0), 0) || 0;
     const remotiveJobCount = remotiveResults?.reduce((total, cat) => total + (cat.jobs?.length || 0), 0) || 0;
     const googleJobCount = googleResults?.reduce((total, cat) => total + (cat.jobs?.length || 0), 0) || 0;
     
     console.log('Internship search complete. Results summary:');
     console.log(`- RapidAPI: ${rapidApiJobCount} jobs (Success: ${hasRapidApiResults})`);
+    console.log(`- Adzuna: ${adzunaJobCount} jobs (Success: ${hasAdzunaResults})`);
     console.log(`- Remotive: ${remotiveJobCount} jobs (Success: ${hasRealRemotiveResults})`);
     console.log(`- Google: ${googleJobCount} jobs`);
-    console.log(`- Total: ${rapidApiJobCount + remotiveJobCount + googleJobCount} jobs`);
+    console.log(`- Total: ${rapidApiJobCount + adzunaJobCount + remotiveJobCount + googleJobCount} jobs`);
     
     return {
       ...(hasRapidApiResults ? { rapidapi: rapidApiResults } : {}),
+      ...(hasAdzunaResults ? { adzuna: adzunaResults } : {}),
       remotive: remotiveResults,
       ...(googleResults ? { google: googleResults } : {})
     };
