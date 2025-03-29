@@ -1190,44 +1190,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { message, history } = req.body;
       
-      // Get user quiz results if authenticated
-      let userContext = "";
+      // Get user quiz results if authenticated - simplified version to avoid API errors
+      let personalityMsg = "";
+      let careerMsg = "";
+      
       if (req.isAuthenticated() && req.user) {
         try {
           const userId = (req.user as any).id;
           const quizResults = await storage.getQuizResults(userId);
           
-          if (quizResults && quizResults.primaryType && quizResults.secondaryType) {
-            // Extract only essential information to avoid overwhelming the API
-            const personalityInfo = {
-              primaryType: quizResults.primaryType && quizResults.primaryType.name ? quizResults.primaryType.name : "Practical",
-              secondaryType: quizResults.secondaryType && quizResults.secondaryType.name ? quizResults.secondaryType.name : "Creative",
-              topStrength: quizResults.strengths && quizResults.strengths.length > 0 ? quizResults.strengths[0] : "Organizing and implementing solutions",
-              recommendedCareers: []
-            };
-            
-            // Safely add careers from primaryType if available
-            if (quizResults.primaryType && quizResults.primaryType.careers && Array.isArray(quizResults.primaryType.careers)) {
-              personalityInfo.recommendedCareers.push(...quizResults.primaryType.careers.slice(0, 2));
+          if (quizResults) {
+            if (quizResults.primaryType && quizResults.primaryType.name) {
+              personalityMsg = `Based on your ${quizResults.primaryType.name} personality type, `;
             }
             
-            // Safely add careers from hybridCareers if available
-            if (quizResults.hybridCareers && Array.isArray(quizResults.hybridCareers)) {
-              personalityInfo.recommendedCareers.push(...quizResults.hybridCareers.slice(0, 2));
+            let recommendedCareers = [];
+            
+            // Try to extract careers safely
+            if (quizResults.primaryType && quizResults.primaryType.careers && 
+                Array.isArray(quizResults.primaryType.careers) && quizResults.primaryType.careers.length > 0) {
+              recommendedCareers.push(quizResults.primaryType.careers[0]);
             }
             
-            // Ensure we have some default careers if none were found
-            if (personalityInfo.recommendedCareers.length === 0) {
-              personalityInfo.recommendedCareers = ["Product Manager", "Project Manager"];
+            if (quizResults.hybridCareers && Array.isArray(quizResults.hybridCareers) && 
+                quizResults.hybridCareers.length > 0) {
+              recommendedCareers.push(quizResults.hybridCareers[0]);
             }
             
-            userContext = `
-User has a primarily ${personalityInfo.primaryType} personality with secondary ${personalityInfo.secondaryType} traits.
-Their top strength: ${personalityInfo.topStrength}
-Recommended careers: ${personalityInfo.recommendedCareers.join(", ")}
-
-Personalize advice based on these traits while respecting privacy.
-`;
+            if (recommendedCareers.length > 0) {
+              careerMsg = `Consider exploring careers like ${recommendedCareers.join(" or ")}.`;
+            }
           }
         } catch (error) {
           console.error("Error fetching user quiz results for chatbot:", error);
@@ -1270,21 +1262,24 @@ Personalize advice based on these traits while respecting privacy.
           maxOutputTokens: 1000,
           temperature: 0.7,
         },
-        systemInstruction: `You are A1, a career advisor for the Aether app. 
-        
-ROLE: Career development assistant who helps with career advice, explains app features, and guides skill development.
-
-APP FEATURES: Quiz (personality assessment), Interests (explore careers), Internships (find opportunities), Profile (store user data).
-
-CAREER OPTIONS: Software Development, Product Management, Data Analysis, IT Support, UX/UI Design.
-
-${userContext}
-
-RESPONSE STYLE: Keep answers concise (3-5 sentences), professional, encouraging, and career-focused.`,
+        systemInstruction: "You are A1, a career advisor for the Aether app. Help with career advice, explain app features, and guide skill development. Focus on Software Development, Product Management, Data Analysis, IT Support, UX/UI Design careers. Keep answers concise, professional, and encouraging.",
       });
 
+      // Add personalized context to the first message if available
+      let enhancedMessage = message;
+      if (personalityMsg || careerMsg) {
+        // Only add personalization if this appears to be a career-related question
+        const careerKeywords = ['career', 'job', 'profession', 'work', 'occupation', 'field', 'industry'];
+        const containsCareerKeyword = careerKeywords.some(keyword => 
+          message.toLowerCase().includes(keyword));
+          
+        if (containsCareerKeyword) {
+          enhancedMessage = `${message}\n\nAdditional context: ${personalityMsg}${careerMsg}`;
+        }
+      }
+      
       // Generate response
-      const result = await chat.sendMessage(message);
+      const result = await chat.sendMessage(enhancedMessage);
       const response = await result.response;
       const text = response.text();
       
