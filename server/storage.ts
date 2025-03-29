@@ -55,75 +55,18 @@ export class MemStorage implements IStorage {
   private locationIdCounter: number;
   private financialIdCounter: number;
 
-  private static instance: MemStorage;
-  private storagePath = './.data';
-
-  private constructor() {
-    // Load persisted data or initialize new maps
-    const data = this.loadPersistedData();
-    this.users = new Map(data.users || []);
-    this.interests = new Map(data.interests || []);
-    this.experiences = new Map(data.experiences || []);
-    this.locations = new Map(data.locations || []);
-    this.financials = new Map(data.financials || []);
+  constructor() {
+    this.users = new Map();
+    this.interests = new Map();
+    this.experiences = new Map();
+    this.locations = new Map();
+    this.financials = new Map();
     
-    this.userIdCounter = data.counters?.userIdCounter || 1;
-    this.interestIdCounter = data.counters?.interestIdCounter || 1;
-    this.experienceIdCounter = data.counters?.experienceIdCounter || 1;
-    this.locationIdCounter = data.counters?.locationIdCounter || 1;
-    this.financialIdCounter = data.counters?.financialIdCounter || 1;
-  }
-
-  public static getInstance(): MemStorage {
-    if (!MemStorage.instance) {
-      MemStorage.instance = new MemStorage();
-    }
-    return MemStorage.instance;
-  }
-
-  private loadPersistedData() {
-    try {
-      const fs = require('fs');
-      if (!fs.existsSync(this.storagePath)) {
-        fs.mkdirSync(this.storagePath, { recursive: true });
-        return {};
-      }
-      
-      const dataPath = `${this.storagePath}/storage.json`;
-      if (!fs.existsSync(dataPath)) {
-        return {};
-      }
-
-      const data = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
-      return data;
-    } catch (error) {
-      console.error('Error loading persisted data:', error);
-      return {};
-    }
-  }
-
-  private persistData() {
-    try {
-      const fs = require('fs');
-      const data = {
-        users: Array.from(this.users.entries()),
-        interests: Array.from(this.interests.entries()),
-        experiences: Array.from(this.experiences.entries()),
-        locations: Array.from(this.locations.entries()),
-        financials: Array.from(this.financials.entries()),
-        counters: {
-          userIdCounter: this.userIdCounter,
-          interestIdCounter: this.interestIdCounter,
-          experienceIdCounter: this.experienceIdCounter,
-          locationIdCounter: this.locationIdCounter,
-          financialIdCounter: this.financialIdCounter,
-        }
-      };
-      
-      fs.writeFileSync(`${this.storagePath}/storage.json`, JSON.stringify(data, null, 2));
-    } catch (error) {
-      console.error('Error persisting data:', error);
-    }
+    this.userIdCounter = 1;
+    this.interestIdCounter = 1;
+    this.experienceIdCounter = 1;
+    this.locationIdCounter = 1;
+    this.financialIdCounter = 1;
   }
 
   // User methods
@@ -178,7 +121,6 @@ export class MemStorage implements IStorage {
     };
     
     this.users.set(id, user);
-    this.persistData();
     return user;
   }
 
@@ -190,7 +132,6 @@ export class MemStorage implements IStorage {
 
     const updatedUser = { ...existingUser, ...userData };
     this.users.set(id, updatedUser);
-    this.persistData();
     return updatedUser;
   }
   
@@ -323,4 +264,4 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = MemStorage.getInstance();
+export const storage = new MemStorage();

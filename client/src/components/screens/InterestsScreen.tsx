@@ -26,10 +26,9 @@ interface InterestsScreenProps {
     interests: Interest[]
   }>>
   navigateTo?: (page: string) => void
-  quizResults?: any // Add quiz results prop
 }
 
-export default function InterestsScreen({ handleBack, interests, setUserData, navigateTo = () => {}, quizResults }: InterestsScreenProps) {
+export default function InterestsScreen({ handleBack, interests, setUserData, navigateTo = () => {} }: InterestsScreenProps) {
   const { toast } = useToast()
   const [newInterest, setNewInterest] = useState("")
   const [userInterests, setUserInterests] = useState<Interest[]>(interests)
@@ -38,64 +37,16 @@ export default function InterestsScreen({ handleBack, interests, setUserData, na
   
   // Check if the quiz has been completed
   useEffect(() => {
-    // If quizResults prop is not provided, check all possible sources for quiz completion
-    const checkUserQuizResults = async () => {
-      // Priority 1: Check if we already have quiz results as a prop
-      const hasQuizResults = quizResults && (
-        quizResults.primaryType || 
-        quizResults.dominantType || 
-        (quizResults.categories && quizResults.categories.length > 0)
-      )
-      
-      if (hasQuizResults) {
-        console.log("Quiz results found in props")
-        setIsQuizCompleted(true)
-        return
-      }
-      
-      // Priority 2: Check URL parameter (coming directly from quiz)
-      const fromQuiz = new URLSearchParams(window.location.search).get('fromQuiz') === 'true'
-      if (fromQuiz) {
-        console.log("Quiz completion detected from URL parameter")
-        setIsQuizCompleted(true)
-        return
-      }
-      
-      // Priority 3: Check browser storage
-      const browserStorageCompleted = 
-        sessionStorage.getItem('quizCompleted') === 'true' || 
-        localStorage.getItem('quizCompleted') === 'true'
-      
-      if (browserStorageCompleted) {
-        console.log("Quiz completion found in browser storage")
-        setIsQuizCompleted(true)
-        return
-      }
-      
-      // Priority 4: Check server API (works for both logged in and anonymous users)
-      try {
-        const response = await fetch('/api/user/quiz-results', { credentials: 'include' })
-        
-        if (response.ok) {
-          const data = await response.json()
-          // For logged in users with results, the response will have 'results'
-          if (data && data.results) {
-            console.log("Quiz results found in user profile")
-            setIsQuizCompleted(true)
-            return
-          }
-        }
-      } catch (err) {
-        console.error("Error checking quiz results:", err)
-      }
-      
-      // If we get here, quiz is not completed from any source
-      console.log("No quiz completion detected from any source")
-      setIsQuizCompleted(false)
-    }
+    // Check for query params to see if we were redirected from another page
+    const path = window.location.pathname
+    const searchParams = new URLSearchParams(window.location.search)
+    const fromQuiz = searchParams.get('fromQuiz') === 'true'
     
-    checkUserQuizResults()
-  }, [quizResults])
+    // Check from sessionStorage if quiz was completed
+    const quizCompleted = sessionStorage.getItem('quizCompleted') === 'true'
+    
+    setIsQuizCompleted(fromQuiz || quizCompleted)
+  }, [])
 
   const handleAddInterest = () => {
     if (newInterest.trim() === "") {
