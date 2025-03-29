@@ -137,7 +137,8 @@ export default function ProfileScreen({
       onBioChange(editedBio)
     } else {
       // Fallback to direct mutation if callback isn't provided
-      if (quizResults) {
+      // Only update quiz results if they already exist and are valid
+      if (quizResults && Object.keys(quizResults).length > 0 && quizResults.primaryType) {
         quizResults.bio = editedBio
       }
       

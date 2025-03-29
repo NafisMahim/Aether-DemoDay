@@ -74,7 +74,7 @@ export default function HomeScreen({ username, navigateTo, quizResults, profileI
             </div>
           )}
           <h2 className="text-lg font-bold">{username}</h2>
-          <p className="text-xs text-gray-500 italic mt-1">"{quizResults?.bio || "Exploring new opportunities and personal growth!"}"</p>
+          <p className="text-xs text-gray-500 italic mt-1">"{quizResults?.bio || "Tell us about yourself in your profile!"}"</p>
         </div>
       </section>
 

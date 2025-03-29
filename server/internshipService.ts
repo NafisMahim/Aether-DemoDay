@@ -421,7 +421,8 @@ export async function generateInternshipRecommendations(
     }
     
     // Deduplicate careers
-    const uniqueCareers = [...new Set(recommendedCareers)];
+    const uniqueCareersSet = new Set(recommendedCareers);
+    const uniqueCareers = Array.from(uniqueCareersSet);
     
     console.log("Personality profile for internship matching:", {
       primaryType,

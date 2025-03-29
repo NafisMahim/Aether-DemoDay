@@ -549,7 +549,10 @@ export default function AetherApp() {
             <HomeScreen 
               username={userData.name} 
               navigateTo={navigateTo} 
-              quizResults={{...quizResults, bio: userData.bio}} 
+              quizResults={quizResults && Object.keys(quizResults).length > 0 ? 
+                {...quizResults, bio: userData.bio} : 
+                null
+              } 
               profileImage={userData.profileImage}
             />
           ) : currentScreen === "quiz" ? (
@@ -589,19 +592,16 @@ export default function AetherApp() {
                   ...userData,
                   bio: newBio
                 })
-                // Also update quizResults
-                if (quizResults) {
+                // Only update quiz results if they exist
+                if (quizResults && Object.keys(quizResults).length > 0 && quizResults.primaryType) {
+                  // Make sure we have real quiz results before updating
                   setQuizResults({
                     ...quizResults,
                     bio: newBio,
                     profileImage: userData.profileImage // Preserve profile image
                   })
-                } else {
-                  setQuizResults({ 
-                    bio: newBio,
-                    profileImage: userData.profileImage // Preserve profile image
-                  })
                 }
+                // Don't create fake quiz results if there aren't any real ones
               }}
             />
           ) : currentScreen === "notifications" ? (
@@ -650,18 +650,15 @@ export default function AetherApp() {
                     })
                     
                     // Update quiz results to include bio so it shows on home screen
-                    if (quizResults) {
+                    // Only if we have real quiz results
+                    if (quizResults && Object.keys(quizResults).length > 0 && quizResults.primaryType) {
                       setQuizResults({
                         ...quizResults,
                         bio: updatedData.bio,
                         profileImage: updatedData.profileImage || userData.profileImage
                       })
-                    } else {
-                      setQuizResults({ 
-                        bio: updatedData.bio,
-                        profileImage: updatedData.profileImage || userData.profileImage
-                      })
                     }
+                    // Don't create fake quiz results
                     
                     toast({
                       title: "Profile updated",
@@ -685,18 +682,15 @@ export default function AetherApp() {
                     profileImage: updatedData.profileImage || userData.profileImage
                   })
                   
-                  if (quizResults) {
+                  // Only update quiz results if they already exist and are valid
+                  if (quizResults && Object.keys(quizResults).length > 0 && quizResults.primaryType) {
                     setQuizResults({
                       ...quizResults,
                       bio: updatedData.bio,
                       profileImage: updatedData.profileImage || userData.profileImage
                     })
-                  } else {
-                    setQuizResults({ 
-                      bio: updatedData.bio,
-                      profileImage: updatedData.profileImage || userData.profileImage
-                    })
                   }
+                  // Don't create fake quiz results
                   
                   toast({
                     title: "Profile updated",
