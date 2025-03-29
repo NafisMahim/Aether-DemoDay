@@ -1177,6 +1177,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // A1 Chatbot API endpoint
+  app.post('/api/chat', async (req, res) => {
+    try {
+      // Check if Gemini AI is available
+      if (!genAI) {
+        return res.status(503).json({
+          success: false,
+          message: "AI service is unavailable. Please ensure GEMINI_API_KEY is set in environment variables."
+        });
+      }
+
+      const { message, history } = req.body;
+      
+      if (!message) {
+        return res.status(400).json({
+          success: false,
+          message: "Message is required"
+        });
+      }
+
+      // Get the model (using gemini-2.0-flash for faster responses)
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      
+      // Format the chat history for Gemini
+      const formattedHistory = history ? history.slice(0, -1).map((msg: any) => ({
+        role: msg.role === 'user' ? 'user' : 'model',
+        parts: [{ text: msg.content }]
+      })) : [];
+      
+      // Create a chat session
+      const chat = model.startChat({
+        history: formattedHistory,
+        generationConfig: {
+          maxOutputTokens: 1000,
+          temperature: 0.7,
+        },
+      });
+
+      // Generate response
+      const result = await chat.sendMessage(message);
+      const response = await result.response;
+      const text = response.text();
+      
+      return res.status(200).json({
+        success: true,
+        response: text
+      });
+    } catch (error) {
+      console.error('A1 Chatbot error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to get response from A1',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

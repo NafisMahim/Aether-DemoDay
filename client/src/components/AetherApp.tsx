@@ -24,6 +24,7 @@ import EditProfileScreen from "./screens/EditProfileScreen"
 import PrivacySecurityScreen from "./screens/PrivacySecurityScreen"
 import NotificationSettingsScreen from "./screens/NotificationSettingsScreen"
 import InternshipsScreen from "./screens/InternshipsScreen"
+import ChatbotScreen from "./screens/ChatbotScreen"
 
 // Main App Component
 export default function AetherApp() {
@@ -46,6 +47,7 @@ export default function AetherApp() {
     | "privacySecurity"
     | "notificationSettings"
     | "internships"
+    | "chatbot"
   >("login")
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
@@ -507,6 +509,13 @@ export default function AetherApp() {
 
   // Handle back navigation
   const handleBack = (data?: any) => {
+    // Check if data is a string destination (for specific navigation targets)
+    if (data && typeof data === "string") {
+      console.log(`Navigating to specific destination: ${data}`);
+      navigateTo(data);
+      return;
+    }
+    
     // Check if data is a React click event (which shouldn't be saved as quiz results)
     if (data && data._reactName) {
       console.log("Received a React event instead of quiz results, ignoring for data storage");
@@ -718,6 +727,10 @@ export default function AetherApp() {
               handleBack={handleBack} 
               quizResults={quizResults}
               interests={userData.interests}
+            />
+          ) : currentScreen === "chatbot" ? (
+            <ChatbotScreen 
+              handleBack={handleBack}
             />
           ) : (
             <ComingSoonScreen screen={currentScreen} handleBack={handleBack} />

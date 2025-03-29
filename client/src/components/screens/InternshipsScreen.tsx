@@ -7,7 +7,7 @@ import { matchQuizResultsToCategories, getJobSearchTerms } from "../../utils/car
 import { Input } from "@/components/ui/input"
 
 interface InternshipsScreenProps {
-  handleBack: () => void
+  handleBack: (data?: any) => void
   quizResults: any
   interests: any[]
 }
@@ -830,13 +830,13 @@ export default function InternshipsScreen({ handleBack, quizResults: initialQuiz
         
         {/* Search & Match Tools */}
         <div className="mb-6 space-y-4">
-          {/* Search Input */}
+          {/* Search Input and A1 Button */}
           <div className="flex items-center gap-2">
-            <div className="relative flex-1">
+            <div className="relative w-1/2"> {/* Changed from flex-1 to w-1/2 */}
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
               <Input
                 type="text"
-                placeholder="Search for internships by keyword..."
+                placeholder="Search internships..."
                 className="pl-9 pr-4 py-2"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -860,6 +860,17 @@ export default function InternshipsScreen({ handleBack, quizResults: initialQuiz
               ) : (
                 'Search'
               )}
+            </Button>
+            
+            {/* Talk to A1 Button */}
+            <Button 
+              onClick={() => handleBack('chatbot')}
+              className="ml-2 flex items-center gap-2 bg-gradient-to-r from-pink-500 to-pink-400 hover:from-pink-600 hover:to-pink-500 text-white"
+            >
+              <div className="flex items-center justify-center w-5 h-5 bg-black rounded-full">
+                <span className="text-xs font-bold text-white">A</span>
+              </div>
+              Talk to A1
             </Button>
           </div>
           
