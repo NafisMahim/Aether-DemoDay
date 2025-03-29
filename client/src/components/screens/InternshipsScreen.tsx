@@ -46,9 +46,46 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
         setIsLoading(true)
         setError(null)
         
+        // First, log the quiz results for debugging
+        console.log("Quiz results for initial search:", quizResults);
+        
+        // Check for primaryType or dominantType before proceeding
+        let primaryType = "";
+        if (quizResults.primaryType) {
+          if (typeof quizResults.primaryType === 'object' && quizResults.primaryType !== null) {
+            primaryType = quizResults.primaryType.name || '';
+          } else if (typeof quizResults.primaryType === 'string') {
+            primaryType = quizResults.primaryType;
+          }
+        } else if (quizResults.dominantType) {
+          primaryType = quizResults.dominantType;
+        } else if (quizResults.chartData && Array.isArray(quizResults.chartData)) {
+          const highestCategory = quizResults.chartData.reduce(
+            (highest: any, current: any) => 
+              (current.value > highest.value) ? current : highest, 
+            { value: 0 }
+          );
+          
+          if (highestCategory && highestCategory.name) {
+            primaryType = highestCategory.name;
+          }
+        } else if (quizResults.categories && Array.isArray(quizResults.categories)) {
+          const highestCategory = quizResults.categories.reduce(
+            (highest: any, current: any) => 
+              (current.score > highest.score) ? current : highest, 
+            { score: 0 }
+          );
+          
+          if (highestCategory && highestCategory.name) {
+            primaryType = highestCategory.name;
+          }
+        }
+        
+        // If no primaryType found, try to match career categories without it
         // Match career categories based on quiz results and interests
         const matchedCategories = matchQuizResultsToCategories({
           ...quizResults,
+          primaryType: primaryType || undefined,
           interests: interests
         })
         
@@ -342,17 +379,55 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
       }
       
       // Extract primary personality type from quiz results using all possible structures
+      // First, log the quiz results so we can see the shape of the data
+      console.log("Quiz results for AI matching:", quizResults);
+      
       let primaryType = "";
+      
+      // Handle different ways the primary type might be stored
       if (quizResults.primaryType) {
-        primaryType = typeof quizResults.primaryType === 'string' 
-          ? quizResults.primaryType 
-          : quizResults.primaryType.name || '';
+        // Check if primaryType is an object with a name property
+        if (typeof quizResults.primaryType === 'object' && quizResults.primaryType !== null) {
+          primaryType = quizResults.primaryType.name || '';
+          console.log("Found primaryType as object with name:", primaryType);
+        } else if (typeof quizResults.primaryType === 'string') {
+          // Handle primaryType as a string
+          primaryType = quizResults.primaryType;
+          console.log("Found primaryType as string:", primaryType);
+        }
       } else if (quizResults.dominantType) {
+        // Alternative field name
         primaryType = quizResults.dominantType;
+        console.log("Found dominantType:", primaryType);
+      } else if (quizResults.chartData && Array.isArray(quizResults.chartData)) {
+        // Try to extract from chart data (highest value)
+        const highestCategory = quizResults.chartData.reduce(
+          (highest: any, current: any) => 
+            (current.value > highest.value) ? current : highest, 
+          { value: 0 }
+        );
+        
+        if (highestCategory && highestCategory.name) {
+          primaryType = highestCategory.name;
+          console.log("Extracted primaryType from chartData:", primaryType);
+        }
+      } else if (quizResults.categories && Array.isArray(quizResults.categories)) {
+        // Try extracting from categories
+        const highestCategory = quizResults.categories.reduce(
+          (highest: any, current: any) => 
+            (current.score > highest.score) ? current : highest, 
+          { score: 0 }
+        );
+        
+        if (highestCategory && highestCategory.name) {
+          primaryType = highestCategory.name;
+          console.log("Extracted primaryType from categories array:", primaryType);
+        }
       }
       
       // Check if we found a valid primary type
       if (!primaryType) {
+        console.error("Failed to find primary type in quiz results:", quizResults);
         toast({
           title: "Incomplete Profile",
           description: "Your quiz results don't contain a primary personality type. Please retake the quiz.",
