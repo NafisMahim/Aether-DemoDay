@@ -1,7 +1,15 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 interface Interest {
   id: number
@@ -24,6 +32,21 @@ export default function InterestsScreen({ handleBack, interests, setUserData, na
   const { toast } = useToast()
   const [newInterest, setNewInterest] = useState("")
   const [userInterests, setUserInterests] = useState<Interest[]>(interests)
+  const [isQuizCompleted, setIsQuizCompleted] = useState(false)
+  const [showQuizPrompt, setShowQuizPrompt] = useState(false)
+  
+  // Check if the quiz has been completed
+  useEffect(() => {
+    // Check for query params to see if we were redirected from another page
+    const path = window.location.pathname
+    const searchParams = new URLSearchParams(window.location.search)
+    const fromQuiz = searchParams.get('fromQuiz') === 'true'
+    
+    // Check from sessionStorage if quiz was completed
+    const quizCompleted = sessionStorage.getItem('quizCompleted') === 'true'
+    
+    setIsQuizCompleted(fromQuiz || quizCompleted)
+  }, [])
 
   const handleAddInterest = () => {
     if (newInterest.trim() === "") {
@@ -75,6 +98,18 @@ export default function InterestsScreen({ handleBack, interests, setUserData, na
       description: "The interest has been removed from your profile."
     })
   }
+  
+  // Handle clicking the internship button
+  const handleInternshipClick = () => {
+    // Check if quiz is completed
+    if (!isQuizCompleted) {
+      // Show prompt dialog
+      setShowQuizPrompt(true)
+    } else {
+      // Navigate to internships page
+      navigateTo("internships")
+    }
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -105,7 +140,7 @@ export default function InterestsScreen({ handleBack, interests, setUserData, na
         <div className="mb-6">
           <h2 className="text-lg font-bold mb-3">Career Opportunities</h2>
           <Button
-            onClick={() => navigateTo("internships")}
+            onClick={handleInternshipClick}
             className="w-full bg-purple-500 hover:bg-purple-600 flex items-center justify-center"
           >
             <svg 
@@ -180,6 +215,40 @@ export default function InterestsScreen({ handleBack, interests, setUserData, na
           ))}
         </div>
       </div>
+      
+      {/* Quiz Completion Dialog */}
+      <Dialog open={showQuizPrompt} onOpenChange={setShowQuizPrompt}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Career Assessment Required</DialogTitle>
+            <DialogDescription>
+              To provide personalized internship recommendations, you need to complete the career assessment quiz first.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col space-y-2 py-4">
+            <p className="text-sm text-gray-600">
+              The internship finder uses your career assessment results to match you with relevant opportunities based on your personality type, strengths, and interests.
+            </p>
+          </div>
+          <DialogFooter className="sm:justify-between">
+            <Button
+              variant="outline"
+              onClick={() => setShowQuizPrompt(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setShowQuizPrompt(false)
+                navigateTo("quiz")
+              }}
+              className="bg-blue-500 hover:bg-blue-600"
+            >
+              Take the Quiz Now
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

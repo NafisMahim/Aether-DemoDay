@@ -158,6 +158,15 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
     } else {
       // Show results and generate AI analysis
       setShowResults(true)
+      
+      // Mark the quiz as completed in sessionStorage
+      try {
+        sessionStorage.setItem('quizCompleted', 'true')
+        console.log('Quiz marked as completed in sessionStorage')
+      } catch (error) {
+        console.error('Error storing quiz completion status:', error)
+      }
+      
       fetchAiAnalysis()
     }
   }
@@ -385,6 +394,13 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
 
   const handleViewDetails = async () => {
     const results = generateCareerData()
+    
+    // Make sure quiz completion is stored in sessionStorage
+    try {
+      sessionStorage.setItem('quizCompleted', 'true')
+    } catch (error) {
+      console.error('Error storing quiz completion status:', error)
+    }
     
     try {
       console.log("Saving quiz results:", {

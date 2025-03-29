@@ -126,9 +126,10 @@ export function matchQuizResultsToCategories(quizResults: any): string[] {
     });
   }
   
-  // If no matches found, return some default categories
+  // If no matches found, return an empty array instead of default categories
+  // This will inform the user that they need to complete the quiz first
   if (categories.size === 0) {
-    return ["Technology", "Business", "Marketing"];
+    return [];
   }
   
   return Array.from(categories);
