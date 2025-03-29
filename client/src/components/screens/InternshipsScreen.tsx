@@ -669,8 +669,8 @@ export default function InternshipsScreen({ handleBack, quizResults: initialQuiz
               
               // Add all jobs to both categories
               const enhancedJobs = result.jobs.map((job: Internship) => {
-                // Add match score from AI if available (or default to 85%)
-                const matchScore = matchScores[job.title] || 85;
+                // Only add match score if it's from the AI
+                const matchScore = matchScores[job.title];
                 return {
                   ...job,
                   matchScore
@@ -981,6 +981,26 @@ export default function InternshipsScreen({ handleBack, quizResults: initialQuiz
                         </span>
                       )}
                     </div>
+                    
+                    {/* Match Score - only show for internships with an actual match score */}
+                    {internship.matchScore && (
+                      <div className="mt-3 flex items-center">
+                        <div className="h-1.5 w-24 bg-gray-200 rounded-full mr-2">
+                          <div 
+                            className="h-1.5 rounded-full" 
+                            style={{ 
+                              width: `${internship.matchScore}%`,
+                              backgroundColor: internship.matchScore > 70 ? '#4ade80' : '#facc15'
+                            }}
+                          ></div>
+                        </div>
+                        <span className="text-xs font-medium" style={{ 
+                          color: internship.matchScore > 70 ? '#16a34a' : '#ca8a04'
+                        }}>
+                          {internship.matchScore}% Match
+                        </span>
+                      </div>
+                    )}
                     
                     <div className="mt-4 flex justify-end">
                       <a 
