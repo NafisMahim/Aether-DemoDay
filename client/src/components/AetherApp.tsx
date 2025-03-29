@@ -480,8 +480,18 @@ export default function AetherApp() {
       const response = await apiRequest("POST", "/api/logout")
       const data = await response.json()
       
+      // Clear user state
       setUser(null)
+      
+      // IMPORTANT: Clear ALL quiz results from state and storage
+      setQuizResults(null)
+      localStorage.removeItem('quizResults')
+      sessionStorage.removeItem('quizResults')
+      console.log("Cleared all quiz results from localStorage and sessionStorage during logout")
+      
+      // Navigate back to login screen
       setCurrentScreen("login")
+      
       toast({
         title: "Logged out",
         description: "You have been successfully logged out.",
