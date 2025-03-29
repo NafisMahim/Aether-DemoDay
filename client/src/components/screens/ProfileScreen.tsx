@@ -91,16 +91,21 @@ export default function ProfileScreen({
     }
   }, []);  // Empty dependency array - run only once
 
-  // Extract quiz result data with more precise fallbacks
-  const personalityType = quizResults?.primaryType?.name || quizResults?.personalityType || "Take a quiz to discover your type"
-  const description = quizResults?.primaryType?.description || quizResults?.description || "Your personality analysis will appear here after completing a quiz."
+  // Check if we have valid quiz results - need primaryType with name
+  const hasCompletedQuiz = !!(quizResults && quizResults.primaryType && quizResults.primaryType.name)
   
-  // Generate strengths and areas to improve from the quiz data
+  // Extract quiz result data only if quiz has been completed
+  const personalityType = hasCompletedQuiz ? quizResults.primaryType.name : "Take a quiz to discover your type"
+  const description = hasCompletedQuiz 
+    ? quizResults.primaryType.description 
+    : "Your personality analysis will appear here after completing a quiz."
+  
+  // Generate strengths and areas to improve ONLY if quiz has been completed
   const strengths: string[] = []
   const weaknesses: string[] = []
   
   // Only generate strengths and weaknesses if we have actual quiz results
-  if (quizResults && quizResults.primaryType) {
+  if (hasCompletedQuiz) {
     // Add recommended careers as strengths if they exist
     if (quizResults.primaryType.careers) {
       strengths.push(...quizResults.primaryType.careers.slice(0, 3).map((career: string) => `Suitable for: ${career}`))

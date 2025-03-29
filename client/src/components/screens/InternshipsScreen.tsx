@@ -669,11 +669,12 @@ export default function InternshipsScreen({ handleBack, quizResults: initialQuiz
               
               // Add all jobs to both categories
               const enhancedJobs = result.jobs.map((job: Internship) => {
-                // Only add match score if it's from the AI
+                // Only add match score if it's calculated by the AI and not undefined
                 const matchScore = matchScores[job.title];
                 return {
                   ...job,
-                  matchScore
+                  // Don't add a default match score if real AI matching wasn't performed
+                  matchScore: matchScore !== undefined ? matchScore : undefined
                 };
               });
               
@@ -829,21 +830,29 @@ export default function InternshipsScreen({ handleBack, quizResults: initialQuiz
             </Button>
           </div>
           
-          {/* AI Match Button */}
+          {/* AI Match Button - only enabled if user has completed the quiz */}
           <Button 
             onClick={handleAIMatch}
-            disabled={isAIMatching || isLoading}
+            disabled={isAIMatching || isLoading || !(quizResults && quizResults.primaryType && quizResults.primaryType.name)}
             className="w-full h-10 flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white font-medium"
+            title={quizResults && quizResults.primaryType && quizResults.primaryType.name ? "Find AI matches based on your quiz results" : "Complete the career quiz first to use AI matching"}
           >
             {isAIMatching ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Finding your perfect match...
               </>
-            ) : (
+            ) : quizResults && quizResults.primaryType && quizResults.primaryType.name ? (
               <>
                 <Sparkles className="h-4 w-4 mr-2" />
                 Find Your Perfect Match
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                Complete Quiz First
               </>
             )}
           </Button>
