@@ -328,6 +328,8 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
     }
   };
   
+  const [showIncompleteProfileBanner, setShowIncompleteProfileBanner] = useState(false);
+  
   // Handle AI match button click with Gemini AI
   const handleAIMatch = async () => {
     try {
@@ -338,11 +340,8 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
       const primaryType = quizResults?.primaryType?.name || quizResults?.dominantType;
       
       if (!primaryType) {
-        toast({
-          title: "Incomplete Profile",
-          description: "Please complete your career quiz first to get personalized matches.",
-          variant: "destructive"
-        });
+        // Display custom banner instead of toast
+        setShowIncompleteProfileBanner(true);
         setIsAIMatching(false);
         return;
       }
@@ -470,6 +469,37 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
 
       {/* Content */}
       <div className="flex-1 px-5 py-4 overflow-y-auto">
+        {/* Incomplete Profile Banner */}
+        {showIncompleteProfileBanner && (
+          <div className="bg-white rounded-xl shadow-md p-5 mb-4 border-l-4 border-red-500">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.485 3.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 3.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">Incomplete Profile</h3>
+                <div className="mt-1 text-sm text-red-700">
+                  <p>Please complete your career quiz first to get personalized matches.</p>
+                </div>
+                <div className="mt-3">
+                  <Button 
+                    size="sm"
+                    onClick={() => {
+                      setShowIncompleteProfileBanner(false);
+                      handleBack();
+                    }}
+                    className="bg-red-100 text-red-800 hover:bg-red-200"
+                  >
+                    Take Quiz
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* Description */}
         <div className="mb-4">
           <p className="text-gray-600">
@@ -607,11 +637,16 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
         
         {/* Error State */}
         {!isLoading && error && (
-          <div className="bg-red-50 text-red-800 rounded-lg p-4 mb-4">
-            <h3 className="font-bold mb-1">Unable to find internships</h3>
-            <p>{error}</p>
+          <div className="bg-white rounded-xl shadow-md p-5 mb-4">
+            <div className="flex items-center text-red-500 mb-2">
+              <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <h3 className="font-bold">Unable to find internships</h3>
+            </div>
+            <p className="text-gray-600 mb-3">{error}</p>
             <Button
-              className="mt-3 bg-red-600 hover:bg-red-700 text-white"
+              className="bg-blue-500 hover:bg-blue-600 text-white"
               onClick={() => handleBack()}
             >
               Go Back
@@ -727,9 +762,14 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
         
         {/* No results for category */}
         {!isLoading && selectedCategory && categoryJobs[selectedCategory]?.length === 0 && (
-          <div className="bg-yellow-50 text-yellow-800 rounded-lg p-4">
-            <h3 className="font-medium">No internships found for {selectedCategory}</h3>
-            <p className="mt-1">Try selecting a different category or updating your profile with more specific interests.</p>
+          <div className="bg-white rounded-xl shadow-md p-5 mb-4">
+            <div className="flex items-center text-yellow-500 mb-2">
+              <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+              </svg>
+              <h3 className="font-bold">No internships found for {selectedCategory}</h3>
+            </div>
+            <p className="text-gray-600">Try selecting a different category or updating your profile with more specific interests.</p>
           </div>
         )}
       </div>

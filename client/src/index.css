@@ -18,6 +18,22 @@ header {
   margin-right: 0.5rem; /* Small space between back button and title */
 }
 
+/* Animations for in-app notifications */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s ease-out forwards;
+}
+
 @layer base {
   * {
     @apply border-border;
