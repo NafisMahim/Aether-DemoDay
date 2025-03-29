@@ -376,17 +376,30 @@ export default function AetherApp() {
 
   // Handle navigation
   const navigateTo = (page: string, data?: any) => {
-    // If data is provided, it contains quiz results that should be saved
+    // Check if data is a React event (has React-specific properties)
+    const isReactEvent = data && (
+      data._reactName || 
+      data.nativeEvent || 
+      data.target || 
+      data.currentTarget ||
+      data.preventDefault
+    );
+    
+    if (isReactEvent) {
+      console.log("Received React event in navigateTo, not saving as quiz results");
+      // Just navigate without saving event as quiz data
+      setCurrentScreen(page as any);
+      return;
+    }
+    
+    // If data is provided and it's not a React event, it contains quiz results that should be saved
     if (data) {
       // Set quiz results regardless of which page we're navigating to
-      setQuizResults(data)
+      setQuizResults(data);
       
       // Always save to localStorage/sessionStorage for redundancy across all navigations
       try {
-        console.log("Auto-saving quiz results during navigation to " + page, {
-          dataExists: !!data, 
-          dataKeys: Object.keys(data)
-        });
+        console.log("Auto-saving quiz results during navigation to " + page);
         
         // Make a deep copy to avoid reference issues
         const dataCopy = JSON.parse(JSON.stringify(data));
@@ -413,9 +426,14 @@ export default function AetherApp() {
       // Even if no new data is provided, ensure we preserve current quiz results
       if (quizResults && Object.keys(quizResults).length > 0) {
         try {
-          console.log("Preserving existing quiz results during navigation to " + page);
-          localStorage.setItem('quizResults', JSON.stringify(quizResults));
-          sessionStorage.setItem('quizResults', JSON.stringify(quizResults));
+          // First, verify this isn't just a React event stored in quizResults accidentally
+          if (!quizResults._reactName && !quizResults.nativeEvent) {
+            console.log("Preserving existing quiz results during navigation to " + page);
+            localStorage.setItem('quizResults', JSON.stringify(quizResults));
+            sessionStorage.setItem('quizResults', JSON.stringify(quizResults));
+          } else {
+            console.warn("Found React event in quizResults, not preserving");
+          }
         } catch (error) {
           console.error("Error preserving quiz results during navigation:", error);
         }
@@ -479,6 +497,13 @@ export default function AetherApp() {
 
   // Handle back navigation
   const handleBack = (data?: any) => {
+    // Check if data is a React click event (which shouldn't be saved as quiz results)
+    if (data && data._reactName) {
+      console.log("Received a React event instead of quiz results, ignoring for data storage");
+      navigateTo("home");
+      return;
+    }
+    
     if (data) {
       navigateTo("home", data)
     } else {

@@ -15,11 +15,71 @@ interface ProfileScreenProps {
   profileImage?: string
 }
 
-export default function ProfileScreen({ handleBack, username, quizResults, bio, onLogout, navigateTo = () => {}, onBioChange, profileImage }: ProfileScreenProps) {
+export default function ProfileScreen({ handleBack, username, quizResults: initialQuizResults, bio, onLogout, navigateTo = () => {}, onBioChange, profileImage }: ProfileScreenProps) {
   const { toast } = useToast()
   const [isEditing, setIsEditing] = useState(false)
   const [editedBio, setEditedBio] = useState(bio)
   const firstLetter = username.charAt(0)
+  
+  // Local state for quiz results with fallbacks
+  const [quizResults, setQuizResults] = useState<any>(initialQuizResults)
+  
+  // Try to load quiz results if not provided or empty
+  useEffect(() => {
+    if (!quizResults || Object.keys(quizResults).length === 0) {
+      console.log("Attempting to restore quiz results in ProfileScreen");
+      
+      // Try to get from sessionStorage first (fastest)
+      try {
+        const sessionData = sessionStorage.getItem('quizResults');
+        if (sessionData) {
+          const parsedData = JSON.parse(sessionData);
+          console.log("Restored quiz results from sessionStorage in ProfileScreen");
+          setQuizResults(parsedData);
+          return;
+        }
+      } catch (error) {
+        console.error("Error loading quiz results from sessionStorage:", error);
+      }
+      
+      // Then try localStorage
+      try {
+        const localData = localStorage.getItem('quizResults');
+        if (localData) {
+          const parsedData = JSON.parse(localData);
+          console.log("Restored quiz results from localStorage in ProfileScreen");
+          setQuizResults(parsedData);
+          return;
+        }
+      } catch (error) {
+        console.error("Error loading quiz results from localStorage:", error);
+      }
+      
+      // Finally try the server
+      fetch('/api/quiz/results', {
+        credentials: 'include'
+      })
+      .then(response => {
+        if (response.ok) {
+          return response.json();
+        }
+        throw new Error("Failed to fetch quiz results from server");
+      })
+      .then(data => {
+        if (data.success && data.results) {
+          console.log("Restored quiz results from server in ProfileScreen");
+          setQuizResults(data.results);
+          
+          // Also update localStorage and sessionStorage
+          localStorage.setItem('quizResults', JSON.stringify(data.results));
+          sessionStorage.setItem('quizResults', JSON.stringify(data.results));
+        }
+      })
+      .catch(error => {
+        console.error("Error fetching quiz results from server:", error);
+      });
+    }
+  }, [quizResults]);
 
   // Extract quiz result data with more precise fallbacks
   const personalityType = quizResults?.primaryType?.name || quizResults?.personalityType || "Take a quiz to discover your type"
