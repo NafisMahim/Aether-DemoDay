@@ -84,6 +84,8 @@ export default function AetherApp() {
             interests: userData.interests // Keep default interests for now
           })
           
+          let foundQuizResults = false;
+          
           // Fetch quiz results from API if user is authenticated
           try {
             const quizResponse = await fetch('/api/quiz/results', {
@@ -96,6 +98,7 @@ export default function AetherApp() {
               
               if (quizData.success && quizData.results) {
                 setQuizResults(quizData.results)
+                foundQuizResults = true;
               }
             } else if (quizResponse.status !== 404) {
               // Don't log 404s as errors since it's normal for new users
@@ -103,6 +106,30 @@ export default function AetherApp() {
             }
           } catch (quizError) {
             console.error('Error fetching quiz results:', quizError)
+          }
+          
+          // If quiz results weren't found from the server, check localStorage
+          if (!foundQuizResults) {
+            try {
+              const localQuizData = localStorage.getItem('quizResults')
+              if (localQuizData) {
+                const parsedData = JSON.parse(localQuizData)
+                console.log('Retrieved quiz results from localStorage:', parsedData)
+                setQuizResults(parsedData)
+                
+                // Also save to server for future sessions
+                try {
+                  console.log("Syncing localStorage quiz results to server")
+                  const saveResponse = await apiRequest("POST", "/api/quiz/results", parsedData)
+                  const saveData = await saveResponse.json()
+                  console.log("Synced localStorage quiz results to server:", saveData)
+                } catch (syncError) {
+                  console.error("Failed to sync localStorage quiz results to server:", syncError)
+                }
+              }
+            } catch (localStorageError) {
+              console.error('Error retrieving quiz results from localStorage:', localStorageError)
+            }
           }
           
           setCurrentScreen("home")
@@ -137,6 +164,8 @@ export default function AetherApp() {
         })
         
         // Fetch quiz results if they exist
+        let foundQuizResults = false;
+        
         try {
           const quizResponse = await fetch('/api/quiz/results', {
             credentials: 'include'
@@ -148,6 +177,7 @@ export default function AetherApp() {
             
             if (quizData.success && quizData.results) {
               setQuizResults(quizData.results)
+              foundQuizResults = true;
             }
           } else if (quizResponse.status !== 404) {
             // 404 is expected for users without quiz results
@@ -155,6 +185,30 @@ export default function AetherApp() {
           }
         } catch (quizError) {
           console.error('Error fetching quiz results after login:', quizError)
+        }
+        
+        // If quiz results weren't found from the server, check localStorage
+        if (!foundQuizResults) {
+          try {
+            const localQuizData = localStorage.getItem('quizResults')
+            if (localQuizData) {
+              const parsedData = JSON.parse(localQuizData)
+              console.log('Retrieved quiz results from localStorage after login:', parsedData)
+              setQuizResults(parsedData)
+              
+              // Also save to server for future sessions
+              try {
+                console.log("Syncing localStorage quiz results to server after login")
+                const saveResponse = await apiRequest("POST", "/api/quiz/results", parsedData)
+                const saveData = await saveResponse.json()
+                console.log("Synced localStorage quiz results to server after login:", saveData)
+              } catch (syncError) {
+                console.error("Failed to sync localStorage quiz results to server after login:", syncError)
+              }
+            }
+          } catch (localStorageError) {
+            console.error('Error retrieving quiz results from localStorage after login:', localStorageError)
+          }
         }
         
         setCurrentScreen("home")
@@ -194,6 +248,8 @@ export default function AetherApp() {
           profileImage: data.user.profileImage || ""
         })
         
+        let foundQuizResults = false;
+        
         // For new users, there's usually no quiz results yet, but check anyway
         try {
           const quizResponse = await fetch('/api/quiz/results', {
@@ -206,11 +262,36 @@ export default function AetherApp() {
             
             if (quizData.success && quizData.results) {
               setQuizResults(quizData.results)
+              foundQuizResults = true;
             }
           }
         } catch (quizError) {
           // Silently fail since new users won't have quiz results
           console.log('No quiz results for new user (expected)')
+        }
+        
+        // For new signups, check if there are any quiz results in localStorage that we should associate with this new account
+        if (!foundQuizResults) {
+          try {
+            const localQuizData = localStorage.getItem('quizResults')
+            if (localQuizData) {
+              const parsedData = JSON.parse(localQuizData)
+              console.log('Found quiz results in localStorage for new user:', parsedData)
+              setQuizResults(parsedData)
+              
+              // Save to server to associate with the new account
+              try {
+                console.log("Saving localStorage quiz results to new user account")
+                const saveResponse = await apiRequest("POST", "/api/quiz/results", parsedData)
+                const saveData = await saveResponse.json()
+                console.log("Saved localStorage quiz results to new user account:", saveData)
+              } catch (syncError) {
+                console.error("Failed to save localStorage quiz results to new user account:", syncError)
+              }
+            }
+          } catch (localStorageError) {
+            console.error('Error retrieving quiz results from localStorage for new user:', localStorageError)
+          }
         }
         
         setCurrentScreen("home")
@@ -261,9 +342,23 @@ export default function AetherApp() {
 
   // Handle navigation
   const navigateTo = (page: string, data?: any) => {
-    if (page === "home" && data) {
-      // If coming from quiz with results
+    // If data is provided, it contains quiz results that should be saved
+    if (data) {
+      // Set quiz results regardless of which page we're navigating to
       setQuizResults(data)
+      
+      // Also save to server in the background for persistence between sessions
+      if (user && user.id) {
+        console.log("Auto-saving quiz results during navigation")
+        apiRequest("POST", "/api/quiz/results", data)
+          .then(response => response.json())
+          .then(responseData => {
+            console.log("Quiz results auto-saved during navigation:", responseData)
+          })
+          .catch(error => {
+            console.error("Failed to auto-save quiz results during navigation:", error)
+          })
+      }
     }
     setCurrentScreen(page as any)
   }

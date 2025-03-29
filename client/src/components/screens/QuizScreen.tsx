@@ -440,8 +440,16 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
             description: "Your assessment results have been saved to your profile.",
           })
           
-          // Pass results back to the home screen
-          handleBack(results)
+          // Store these results in localStorage as a backup
+          try {
+            localStorage.setItem('quizResults', JSON.stringify(quizData))
+            console.log("Quiz results also saved to localStorage as backup")
+          } catch (err) {
+            console.error("Could not save quiz results to localStorage:", err)
+          }
+          
+          // Pass quiz data back for navigation
+          handleBack(quizData)
         } else {
           // If response is 401 Unauthorized, we need to inform the user
           if (response.status === 401) {
@@ -450,8 +458,16 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
               description: "Please log in first to save results to your profile.",
               variant: "destructive",
             })
-            // Still return results to the home screen
-            handleBack(results)
+            // Store in localStorage for backup
+            try {
+              localStorage.setItem('quizResults', JSON.stringify(quizData))
+              console.log("Quiz results saved to localStorage since user is not authenticated")
+            } catch (err) {
+              console.error("Could not save quiz results to localStorage:", err)
+            }
+            
+            // Pass quiz data back for navigation
+            handleBack(quizData)
             return
           }
           
@@ -464,8 +480,16 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
             variant: "destructive",
           })
           
-          // Return to home with results anyway
-          handleBack(results)
+          // Store in localStorage for backup
+          try {
+            localStorage.setItem('quizResults', JSON.stringify(quizData))
+            console.log("Quiz results saved to localStorage despite API error")
+          } catch (err) {
+            console.error("Could not save quiz results to localStorage:", err)
+          }
+          
+          // Pass quiz data back for navigation
+          handleBack(quizData)
         }
       } catch (apiError) {
         console.error("API call error:", apiError)
@@ -475,8 +499,37 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
           variant: "destructive",
         })
         
-        // Return to home with results anyway
-        handleBack(results)
+        // Store in localStorage for backup
+        try {
+          // Create quiz data to prepare for storage
+          const quizData = {
+            primaryType: {
+              name: results.primaryType?.name || '',
+              score: results.primaryType?.score || 0,
+              description: results.primaryType?.description || '',
+              careers: results.primaryType?.careers || []
+            },
+            secondaryType: {
+              name: results.secondaryType?.name || '',
+              score: results.secondaryType?.score || 0,
+              description: results.secondaryType?.description || '',
+              careers: results.secondaryType?.careers || []
+            },
+            categories: results.categories || [],
+            hybridCareers: results.hybridCareers || [],
+            dominantType: results.primaryType?.name || '',
+            savedAt: new Date().toISOString()
+          }
+          localStorage.setItem('quizResults', JSON.stringify(quizData))
+          console.log("Quiz results saved to localStorage as fallback")
+          
+          // Pass the quiz data back for navigation
+          handleBack(quizData)
+        } catch (err) {
+          console.error("Could not save quiz results to localStorage:", err)
+          // Fallback to just passing raw results
+          handleBack(results)
+        }
       }
     } catch (error) {
       console.error("Error in handleViewDetails:", error)
@@ -486,13 +539,44 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
         variant: "destructive",
       })
     }
-    
-    handleBack(results)
+    // No need for handleBack here as it's already called in the proper catch blocks
   }
 
   const handleReturnHome = () => {
     const results = generateCareerData()
-    handleBack(results)
+    
+    // Create and store formatted quiz data
+    try {
+      const quizData = {
+        primaryType: {
+          name: results.primaryType?.name || '',
+          score: results.primaryType?.score || 0,
+          description: results.primaryType?.description || '',
+          careers: results.primaryType?.careers || []
+        },
+        secondaryType: {
+          name: results.secondaryType?.name || '',
+          score: results.secondaryType?.score || 0,
+          description: results.secondaryType?.description || '',
+          careers: results.secondaryType?.careers || []
+        },
+        categories: results.categories || [],
+        hybridCareers: results.hybridCareers || [],
+        dominantType: results.primaryType?.name || '',
+        savedAt: new Date().toISOString()
+      }
+      
+      // Save to localStorage for persistence
+      localStorage.setItem('quizResults', JSON.stringify(quizData))
+      console.log("Quiz results saved to localStorage from Return Home button")
+      
+      // Pass structured data back
+      handleBack(quizData)
+    } catch (err) {
+      console.error("Could not prepare quiz data in handleReturnHome:", err)
+      // Fallback to raw results
+      handleBack(results)
+    }
   }
 
   const renderPieChart = () => {
@@ -561,7 +645,41 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
     <div className="flex flex-col h-full">
       {/* Header */}
       <header className="bg-white shadow-sm px-5 mobile-header flex items-center">
-        <button className="back-button p-2 rounded-full hover:bg-gray-100 transition-colors" onClick={() => handleBack()}>
+        <button className="back-button p-2 rounded-full hover:bg-gray-100 transition-colors" onClick={() => {
+          if (showResults) {
+            // If results are showing, generate and store the data before going back
+            try {
+              const results = generateCareerData();
+              const quizData = {
+                primaryType: {
+                  name: results.primaryType?.name || '',
+                  score: results.primaryType?.score || 0,
+                  description: results.primaryType?.description || '',
+                  careers: results.primaryType?.careers || []
+                },
+                secondaryType: {
+                  name: results.secondaryType?.name || '',
+                  score: results.secondaryType?.score || 0,
+                  description: results.secondaryType?.description || '',
+                  careers: results.secondaryType?.careers || []
+                },
+                categories: results.categories || [],
+                hybridCareers: results.hybridCareers || [],
+                dominantType: results.primaryType?.name || '',
+                savedAt: new Date().toISOString()
+              };
+              localStorage.setItem('quizResults', JSON.stringify(quizData));
+              console.log("Quiz results saved to localStorage from back button");
+              handleBack(quizData);
+            } catch (err) {
+              console.error("Could not save quiz results from back button:", err);
+              handleBack();
+            }
+          } else {
+            // If in question phase, just go back
+            handleBack();
+          }
+        }}>
           <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
           </svg>
