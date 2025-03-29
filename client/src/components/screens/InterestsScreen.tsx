@@ -216,28 +216,35 @@ export default function InterestsScreen({ handleBack, interests, setUserData, na
         </div>
       </div>
       
-      {/* Quiz Completion Dialog - REVERTED TO ORIGINAL DESIGN */}
+      {/* Quiz Completion Dialog - Original popup design */}
       <Dialog open={showQuizPrompt} onOpenChange={setShowQuizPrompt}>
-        <DialogContent className="p-0 bg-white rounded-2xl shadow-lg overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-4 text-white">
-            <h3 className="text-xl font-bold">Complete Career Quiz First</h3>
+        <DialogContent className="p-0 bg-white rounded-3xl shadow-lg overflow-hidden max-w-xs mx-auto">
+          <div className="bg-blue-500 p-4 text-white flex justify-between items-center">
+            <h3 className="text-lg font-semibold">Take the Quiz First</h3>
+            <button onClick={() => setShowQuizPrompt(false)} className="text-white hover:text-blue-100">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
           </div>
           
-          <div className="p-4">
-            <p className="text-sm text-gray-600 mb-4">
-              To find internships that match your skills and interests, please complete the career assessment quiz.
+          <div className="p-5">
+            <p className="text-sm text-gray-600 mb-5">
+              To find personalized internship recommendations, please complete the career assessment quiz first.
             </p>
             
             <div className="flex justify-end space-x-2">
               <Button 
                 variant="outline" 
-                className="text-gray-700 rounded-xl"
+                size="sm"
+                className="rounded-full text-sm"
                 onClick={() => setShowQuizPrompt(false)}
               >
                 Later
               </Button>
               <Button 
-                className="bg-blue-500 text-white rounded-xl"
+                size="sm"
+                className="bg-blue-500 text-white rounded-full text-sm"
                 onClick={() => {
                   setShowQuizPrompt(false)
                   navigateTo("quiz")
