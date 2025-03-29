@@ -330,13 +330,32 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
       setIsAIMatching(true);
       setError(null);
       
-      // Get the primary personality type from quiz results
-      const primaryType = quizResults?.primaryType?.name || quizResults?.dominantType;
-      
-      if (!primaryType) {
+      // Check if quiz results are available and properly structured
+      if (!quizResults) {
         toast({
           title: "Incomplete Profile",
           description: "Please complete your career quiz first to get personalized matches.",
+          variant: "destructive"
+        });
+        setIsAIMatching(false);
+        return;
+      }
+      
+      // Extract primary personality type from quiz results using all possible structures
+      let primaryType = "";
+      if (quizResults.primaryType) {
+        primaryType = typeof quizResults.primaryType === 'string' 
+          ? quizResults.primaryType 
+          : quizResults.primaryType.name || '';
+      } else if (quizResults.dominantType) {
+        primaryType = quizResults.dominantType;
+      }
+      
+      // Check if we found a valid primary type
+      if (!primaryType) {
+        toast({
+          title: "Incomplete Profile",
+          description: "Your quiz results don't contain a primary personality type. Please retake the quiz.",
           variant: "destructive"
         });
         setIsAIMatching(false);
@@ -348,10 +367,13 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
         description: `Analyzing your ${primaryType} personality type and career interests with AI...`,
       });
       
-      // Create simplified user profile with interests
+      // Enhance the userProfile with more data from quizResults
       const userProfile = {
         interests: interests || [],
-        personalityType: primaryType
+        personalityType: primaryType,
+        categories: quizResults.categories || [],
+        strengths: quizResults.strengths || [],
+        hybridCareers: quizResults.hybridCareers || []
       };
       
       // Get career suggestions based on quiz results
@@ -359,6 +381,8 @@ export default function InternshipsScreen({ handleBack, quizResults, interests }
         ...quizResults,
         interests: interests
       });
+      
+      console.log('Matched career categories:', matchedCategories);
       
       // Extract job titles and keywords for better matching
       const { jobTitles, keywords } = getJobSearchTerms(matchedCategories);

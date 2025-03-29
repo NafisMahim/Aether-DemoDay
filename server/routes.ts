@@ -154,14 +154,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const { userProfile, quizResults, jobTitles, keywords, limit, isPersonalizedMatch } = req.body;
       
-      if (!quizResults || !quizResults.primaryType) {
+      // Enhanced validation for quiz results to support multiple formats
+      let primaryType: string = '';
+      
+      if (quizResults) {
+        if (quizResults.primaryType) {
+          if (typeof quizResults.primaryType === 'string') {
+            primaryType = quizResults.primaryType;
+          } else if (quizResults.primaryType.name) {
+            primaryType = quizResults.primaryType.name;
+          }
+        } else if (quizResults.dominantType) {
+          primaryType = quizResults.dominantType;
+        }
+      }
+      
+      if (!primaryType) {
         return res.status(400).json({
           success: false,
-          message: "Quiz results are required for AI matching"
+          message: "Quiz results are missing or don't contain a primary personality type"
         });
       }
       
-      console.log('Starting internship matching with AI...');
+      console.log('Starting internship matching with AI for personality type:', primaryType);
       
       // Log the received parameters for debugging
       console.log('Internship search parameters:', {
@@ -170,12 +185,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isPersonalizedMatch: !!isPersonalizedMatch
       });
       
-      // Get career categories from quiz results
-      const careerCategories = quizResults.primaryType.careers || [];
+      // Get career categories from quiz results in different formats
+      let careerCategories: string[] = [];
+      
+      // Try to extract careers from both formats
+      if (quizResults.primaryType && quizResults.primaryType.careers) {
+        careerCategories = quizResults.primaryType.careers;
+      } else if (quizResults.categories) {
+        // Extract from categories
+        quizResults.categories.forEach((category: any) => {
+          if (category.careers && Array.isArray(category.careers)) {
+            careerCategories.push(...category.careers);
+          }
+        });
+      } else if (quizResults.hybridCareers) {
+        // Include hybrid careers if available
+        careerCategories = quizResults.hybridCareers;
+      }
       
       // If isPersonalizedMatch is true, prioritize the job titles sent from the client
       // which are derived from the matchQuizResultsToCategories function
-      let searchTerms = [];
+      let searchTerms: string[] = [];
       
       if (isPersonalizedMatch && Array.isArray(jobTitles) && jobTitles.length > 0) {
         // Use the career-mapped job titles from client as priority search terms
@@ -187,16 +217,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('Using combined search terms from all sources');
       }
       
-      // Get a reasonable set of search terms to use (limit to 5 for API efficiency)
-      const uniqueTerms = Array.from(new Set(searchTerms)).slice(0, 5);
+      // Ensure personalityType (primary type) is included in search terms
+      if (primaryType && !searchTerms.includes(primaryType)) {
+        searchTerms.push(primaryType);
+      }
+      
+      // Get a reasonable set of search terms to use (limit to 7 for API efficiency but more than before)
+      const uniqueTerms = Array.from(new Set(searchTerms)).slice(0, 7);
       console.log('Searching for internships matching these career categories:', uniqueTerms);
+      
+      // Find internships matching these categories, with keywords if available
+      const personalizedKeywords = isPersonalizedMatch && Array.isArray(keywords) ? keywords : [];
       
       // Find internships matching these categories
       const internships = await findInternships(
         uniqueTerms,
-        [],
-        limit || 10,
-        isPersonalizedMatch
+        personalizedKeywords,
+        limit || 15, // Increased limit for better matching
+        !!isPersonalizedMatch
       );
       
       // Use Gemini AI to match internships to the user's profile

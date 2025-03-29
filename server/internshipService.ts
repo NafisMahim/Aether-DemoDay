@@ -391,6 +391,30 @@ export async function generateInternshipRecommendations(
       };
     }
     
+    // Extract personality information from quiz results
+    const primaryType = quizResults.primaryType?.name || quizResults.dominantType || "";
+    const secondaryType = quizResults.secondaryType?.name || "";
+    
+    // Get career strengths from categories if available
+    let strengths: string[] = [];
+    if (quizResults.primaryType?.description) {
+      strengths.push(quizResults.primaryType.description);
+    }
+    if (quizResults.strengths && Array.isArray(quizResults.strengths)) {
+      strengths = [...strengths, ...quizResults.strengths];
+    }
+    
+    // Get recommended careers from quiz results was gathered earlier in primaryCareers 
+    // No need to gather again, already available in primaryCareers
+    
+    console.log("Personality profile for internship matching:", {
+      primaryType,
+      secondaryType,
+      strengths: strengths.length > 0 ? strengths.slice(0, 3) : ["No specific strengths found"],
+      recommendedCareers: primaryCareers.length > 0 ? primaryCareers.slice(0, 5) : ["No specific careers found"],
+      interests: userProfile.interests?.length || 0
+    });
+    
     // Extract all internship titles for matching
     const allInternshipTitles: string[] = [];
     const internshipDetails: Record<string, any> = {};
@@ -404,7 +428,10 @@ export async function generateInternshipRecommendations(
             internshipDetails[job.title] = {
               company: job.company_name,
               description: job.description,
-              id: job.id
+              id: job.id,
+              url: job.url,
+              location: job.candidate_required_location,
+              category: category.query
             };
           });
         }
@@ -420,7 +447,10 @@ export async function generateInternshipRecommendations(
             internshipDetails[job.title] = {
               company: job.company_name,
               description: job.description,
-              id: job.id
+              id: job.id,
+              url: job.url,
+              location: job.candidate_required_location,
+              category: category.query
             };
           });
         }
@@ -436,7 +466,10 @@ export async function generateInternshipRecommendations(
             internshipDetails[job.title] = {
               company: job.company_name,
               description: job.description,
-              id: job.id
+              id: job.id,
+              url: job.url,
+              location: job.candidate_required_location || "Location not specified",
+              category: category.query
             };
           });
         }
@@ -452,6 +485,8 @@ export async function generateInternshipRecommendations(
       };
     }
     
+    console.log(`Found ${allInternshipTitles.length} internship listings to analyze with AI.`);
+    
     console.log(`Analyzing ${allInternshipTitles.length} internships for personalized recommendations`);
     
     // Get a Gemini model instance
@@ -460,14 +495,14 @@ export async function generateInternshipRecommendations(
     // Extract career interests and strengths from quiz results
     const primaryCareerType = quizResults?.primaryType?.name || "Unknown";
     const secondaryCareerType = quizResults?.secondaryType?.name || "Unknown";
-    const recommendedCareers = quizResults?.primaryType?.careers || [];
+    const primaryCareers = quizResults?.primaryType?.careers || [];
     
     // Combine interests from both profile and quiz
     const interests = [
       ...(userProfile?.interests || []).map((i: any) => i.category),
       primaryCareerType,
       secondaryCareerType,
-      ...recommendedCareers
+      ...primaryCareers
     ];
     
     // Format the prompt for Gemini
@@ -476,7 +511,7 @@ export async function generateInternshipRecommendations(
       
       STUDENT PROFILE:
       Career Type: ${primaryCareerType} (primary), ${secondaryCareerType} (secondary)
-      Recommended Careers: ${recommendedCareers.join(', ')}
+      Recommended Careers: ${primaryCareers.join(', ')}
       Interests: ${interests.join(', ')}
       
       AVAILABLE INTERNSHIPS:

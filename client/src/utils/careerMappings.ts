@@ -103,6 +103,33 @@ export function matchQuizResultsToCategories(quizResults: any): string[] {
     });
   }
   
+  // Check for career categories based on dominant/primary type
+  if (quizResults && quizResults.dominantType) {
+    const dominantType = quizResults.dominantType.toLowerCase();
+    categories.add(dominantType.charAt(0).toUpperCase() + dominantType.slice(1));
+  }
+  
+  // Check for career categories based on primaryType from the new quiz format
+  if (quizResults && quizResults.primaryType) {
+    if (typeof quizResults.primaryType === 'string') {
+      categories.add(quizResults.primaryType);
+    } else if (quizResults.primaryType.name) {
+      categories.add(quizResults.primaryType.name);
+      
+      // Also add careers from primaryType if available
+      if (quizResults.primaryType.careers && Array.isArray(quizResults.primaryType.careers)) {
+        quizResults.primaryType.careers.forEach((career: string) => {
+          Object.keys(interestToCareerMap).forEach(category => {
+            if (career.toLowerCase().includes(category.toLowerCase()) ||
+                category.toLowerCase().includes(career.toLowerCase())) {
+              categories.add(category);
+            }
+          });
+        });
+      }
+    }
+  }
+  
   // Add categories from interests
   if (quizResults && quizResults.interests) {
     quizResults.interests.forEach((interest: any) => {
