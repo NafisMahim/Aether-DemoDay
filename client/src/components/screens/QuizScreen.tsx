@@ -490,26 +490,35 @@ export default function QuizScreen({ handleBack }: QuizScreenProps) {
     const data = generateCareerData().chartData
     
     return (
-      <ResponsiveContainer width="100%" height={250}>
-        <PieChart>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="50%"
-            innerRadius={60}
-            outerRadius={80}
-            paddingAngle={5}
-            dataKey="value"
-            label={({name, percent}) => `${name}: ${(percent * 100).toFixed(0)}%`}
-          >
-            {data.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={entry.color} />
-            ))}
-          </Pie>
-          <Tooltip formatter={(value) => `${value}%`} />
-          <Legend />
-        </PieChart>
-      </ResponsiveContainer>
+      <div className="flex flex-col items-center">
+        <ResponsiveContainer width="100%" height={180}>
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              innerRadius={40}
+              outerRadius={60}
+              paddingAngle={5}
+              dataKey="value"
+              label={false}
+            >
+              {data.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.color} />
+              ))}
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+        
+        <div className="w-full mt-2 grid grid-cols-2 gap-x-2 gap-y-1 text-sm">
+          {data.map((entry) => (
+            <div key={entry.name} className="flex items-center">
+              <div className="w-3 h-3 mr-2" style={{ backgroundColor: entry.color }}></div>
+              <span>{entry.name}: {entry.value}%</span>
+            </div>
+          ))}
+        </div>
+      </div>
     )
   }
 
