@@ -1197,11 +1197,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const userId = (req.user as any).id;
           const quizResults = await storage.getQuizResults(userId);
           
-          if (quizResults) {
-            userContext = `
-User's quiz results: ${JSON.stringify(quizResults)}
+          if (quizResults && quizResults.primaryType && quizResults.secondaryType) {
+            // Extract only essential information to avoid overwhelming the API
+            const personalityInfo = {
+              primaryType: quizResults.primaryType && quizResults.primaryType.name ? quizResults.primaryType.name : "Practical",
+              secondaryType: quizResults.secondaryType && quizResults.secondaryType.name ? quizResults.secondaryType.name : "Creative",
+              topStrength: quizResults.strengths && quizResults.strengths.length > 0 ? quizResults.strengths[0] : "Organizing and implementing solutions",
+              recommendedCareers: []
+            };
             
-Based on this user's profile, personalize your career advice while respecting their privacy.
+            // Safely add careers from primaryType if available
+            if (quizResults.primaryType && quizResults.primaryType.careers && Array.isArray(quizResults.primaryType.careers)) {
+              personalityInfo.recommendedCareers.push(...quizResults.primaryType.careers.slice(0, 2));
+            }
+            
+            // Safely add careers from hybridCareers if available
+            if (quizResults.hybridCareers && Array.isArray(quizResults.hybridCareers)) {
+              personalityInfo.recommendedCareers.push(...quizResults.hybridCareers.slice(0, 2));
+            }
+            
+            // Ensure we have some default careers if none were found
+            if (personalityInfo.recommendedCareers.length === 0) {
+              personalityInfo.recommendedCareers = ["Product Manager", "Project Manager"];
+            }
+            
+            userContext = `
+User has a primarily ${personalityInfo.primaryType} personality with secondary ${personalityInfo.secondaryType} traits.
+Their top strength: ${personalityInfo.topStrength}
+Recommended careers: ${personalityInfo.recommendedCareers.join(", ")}
+
+Personalize advice based on these traits while respecting privacy.
 `;
           }
         } catch (error) {
@@ -1245,32 +1270,17 @@ Based on this user's profile, personalize your career advice while respecting th
           maxOutputTokens: 1000,
           temperature: 0.7,
         },
-        systemInstruction: `You are A1, an AI career development assistant for the Aether app. 
+        systemInstruction: `You are A1, a career advisor for the Aether app. 
         
-Your primary functions are:
-1. Providing personalized career advice based on the user's profile, skills, and quiz results
-2. Explaining Aether app features (Home, Quiz, Interests, Profile, Internships)
-3. Guiding users through career exploration based on their skills and interests
-4. Offering advice on skill development and job searching strategies
+ROLE: Career development assistant who helps with career advice, explains app features, and guides skill development.
 
-Key app features to know:
-- Quiz: Assesses user's personality traits and provides career recommendations
-- Interests: Allows users to explore and save career interests
-- Internships: Helps find relevant internships based on skills and interests
-- Profile: Stores user information, quiz results, and career preferences
+APP FEATURES: Quiz (personality assessment), Interests (explore careers), Internships (find opportunities), Profile (store user data).
 
-When users ask about career options, reference practical careers like:
-- Software Development
-- Product Management
-- Data Analysis
-- IT Support
-- UX/UI Design
-- Digital Marketing
-- Business Analysis
+CAREER OPTIONS: Software Development, Product Management, Data Analysis, IT Support, UX/UI Design.
 
 ${userContext}
 
-Keep responses concise (3-5 sentences), professional, encouraging, and focused on career development. If you don't know an answer, suggest using the appropriate app feature rather than making up information.`,
+RESPONSE STYLE: Keep answers concise (3-5 sentences), professional, encouraging, and career-focused.`,
       });
 
       // Generate response
