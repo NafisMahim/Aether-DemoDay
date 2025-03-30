@@ -1273,8 +1273,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isFirstMessage = !formattedHistory.length;
       
       if (isFirstMessage) {
-        // Add AI instructions to the first message
-        enhancedMessage = `You are A1, a career advisor for the Aether app. Help with career advice, explain app features, and guide skill development. Focus on Software Development, Product Management, Data Analysis, IT Support, UX/UI Design careers. Keep answers concise, professional, and encouraging.
+        // Add AI instructions to the first message with emphasis on brevity
+        enhancedMessage = `You are A1, a career advisor for the Aether app. Help with career advice, explain app features, and guide skill development. Focus on Software Development, Product Management, Data Analysis, IT Support, UX/UI Design careers. 
+
+EXTREMELY IMPORTANT: Keep your answers extremely concise (1 paragraph only, about 2-3 sentences) unless the user specifically asks for more detail. Be professional and encouraging but prioritize brevity above all else.
 
 Now, please respond to this user message: ${message}`;
       }
@@ -1290,13 +1292,15 @@ Now, please respond to this user message: ${message}`;
           // If it's the first message, we already have our instructions
           // Otherwise, add the context directly
           if (isFirstMessage) {
-            enhancedMessage = `You are A1, a career advisor for the Aether app. Help with career advice, explain app features, and guide skill development. Focus on Software Development, Product Management, Data Analysis, IT Support, UX/UI Design careers. Keep answers concise, professional, and encouraging.
+            enhancedMessage = `You are A1, a career advisor for the Aether app. Help with career advice, explain app features, and guide skill development. Focus on Software Development, Product Management, Data Analysis, IT Support, UX/UI Design careers.
+
+EXTREMELY IMPORTANT: Keep your answers extremely concise (1 paragraph only, about 2-3 sentences) unless the user specifically asks for more detail. Be professional and encouraging but prioritize brevity above all else.
 
 User information: ${personalityMsg}${careerMsg}
 
 Now, please respond to this user message: ${message}`;
           } else {
-            enhancedMessage = `${message}\n\nAdditional context: ${personalityMsg}${careerMsg}`;
+            enhancedMessage = `${message}\n\nAdditional context: ${personalityMsg}${careerMsg}\n\nREMINDER: Keep your response extremely concise (1 paragraph of 2-3 sentences) unless specifically asked for more detail.`;
           }
         }
       }
