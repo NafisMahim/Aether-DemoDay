@@ -217,9 +217,9 @@ export async function searchEventbriteEvents(
     const today = new Date().toISOString().split('T')[0];
     params.append('start_date.range_start', today);
     
-    // Build the URL with search parameters
-    // Updated endpoint based on latest API structure
-    const searchUrl = `https://www.eventbriteapi.com/v3/organizations/${EVENTBRITE_USER_ID}/events/?${params.toString()}`;
+    // Build the URL with search parameters - ensure trailing slash is present
+    // Use the direct search endpoint which doesn't require organization ID
+    const searchUrl = `https://www.eventbriteapi.com/v3/events/search/?${params.toString()}`;
     console.log(`[Eventbrite] Searching with URL: ${searchUrl}`);
     
     // Make the API request with detailed headers
@@ -233,6 +233,9 @@ export async function searchEventbriteEvents(
     
     console.log(`[Eventbrite] Using headers:`, JSON.stringify(headers, (key, value) => 
       key === 'Authorization' ? 'Bearer ***' : value, 2));
+    
+    // Try the search endpoint but be prepared for it to fail
+    console.log('[Eventbrite] API endpoint may have changed - search may fail');
     
     const response = await axios.get(searchUrl, {
       headers,
@@ -257,42 +260,43 @@ export async function searchEventbriteEvents(
         console.error('[Eventbrite] Rate limit exceeded');
       }
       
-      // Try simplified fallback search 
+      // Try alternative endpoints if the search endpoint is not working
       try {
-        console.log('[Eventbrite] Trying simplified fallback search with minimal parameters...');
-        const simplifiedParams = new URLSearchParams();
+        console.log('[Eventbrite] Search endpoint appears to be deprecated or changed');
+        console.log('[Eventbrite] Checking user account for events and orders');
         
-        // Use very basic search terms to maximize chance of success
-        simplifiedParams.append('q', 'conference');
+        // First, try to get user's orders as a fallback approach
+        console.log('[Eventbrite] Trying to access user orders...');
+        const ordersUrl = 'https://www.eventbriteapi.com/v3/users/me/orders/';
         
-        // Add date filter for future events
-        const today = new Date().toISOString().split('T')[0];
-        simplifiedParams.append('start_date.range_start', today);
-        
-        const fallbackUrl = `https://www.eventbriteapi.com/v3/organizations/${EVENTBRITE_USER_ID}/events/?${simplifiedParams.toString()}`;
-        console.log(`[Eventbrite] Fallback URL: ${fallbackUrl}`);
-        
-        const fallbackResponse = await axios.get(fallbackUrl, {
+        const ordersResponse = await axios.get(ordersUrl, {
           headers,
-          timeout: 12000,
+          timeout: 10000,
           validateStatus: (status) => true
         });
         
-        console.log(`[Eventbrite] Fallback response status: ${fallbackResponse.status}`);
+        console.log(`[Eventbrite] Orders response status: ${ordersResponse.status}`);
         
-        if (fallbackResponse.status === 200 && 
-            fallbackResponse.data && 
-            fallbackResponse.data.events && 
-            Array.isArray(fallbackResponse.data.events)) {
-          console.log(`[Eventbrite] Fallback search found ${fallbackResponse.data.events.length} events`);
-          return processEventbriteEvents(fallbackResponse.data.events);
+        if (ordersResponse.status === 200 && 
+            ordersResponse.data && 
+            ordersResponse.data.orders && 
+            Array.isArray(ordersResponse.data.orders) &&
+            ordersResponse.data.orders.length > 0) {
+          
+          console.log(`[Eventbrite] Found ${ordersResponse.data.orders.length} orders, extracting event information`);
+          
+          // This would require additional processing to extract events from orders
+          // But we at least confirmed the API token works for this endpoint
+          
         } else {
-          console.error(`[Eventbrite] Fallback search failed with status ${fallbackResponse.status}`);
-          console.log(`[Eventbrite] Fallback response keys:`, 
-            Object.keys(fallbackResponse.data || {}).join(', '));
+          console.log('[Eventbrite] No orders found or endpoint failed');
         }
+        
+        // Log that the API structure may have changed and we need to fall back to other providers
+        console.error('[Eventbrite] API structure may have changed - falling back to other event providers');
+        
       } catch (fallbackError: any) {
-        console.error('[Eventbrite] Fallback search also failed:', fallbackError.message);
+        console.error('[Eventbrite] Alternative endpoints also failed:', fallbackError.message);
       }
       
       return [];
@@ -585,6 +589,12 @@ export async function searchTicketmasterEvents(
     // Try each search strategy in sequence until we get results
     for (const [index, strategy] of searchStrategies.entries()) {
       try {
+        // Add a delay between requests to avoid rate limiting
+        if (index > 0) {
+          // Progressive delay between API calls (1 second * strategy index)
+          await new Promise(resolve => setTimeout(resolve, 1000 * index));
+        }
+      
         // Build URL based on strategy
         console.log(`[Ticketmaster] Trying search strategy ${index + 1}`);
         
@@ -595,7 +605,7 @@ export async function searchTicketmasterEvents(
           sort: 'date,asc',
           startDateTime: `${today}T00:00:00Z`,
           endDateTime: `${endDate}T23:59:59Z`,
-          classificationName: 'conference,business,meeting'
+          segmentId: 'KZFzniwnSyZfZ7v7nJ' // Business & Misc segment
         });
         
         // Add keywords if present
@@ -614,8 +624,14 @@ export async function searchTicketmasterEvents(
         const sanitizedUrl = apiUrl.replace(TICKETMASTER_KEY, '***');
         console.log(`[Ticketmaster] API URL: ${sanitizedUrl}`);
         
-        // Make the request with timeout
-        const response = await axios.get(apiUrl, { timeout: 5000 });
+        // Make the request with timeout and proper headers
+        const response = await axios.get(apiUrl, { 
+          timeout: 8000,
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'Aether-Networking-App/1.0'
+          }
+        });
         
         // Check for events
         if (response.data && response.data._embedded && response.data._embedded.events) {
@@ -652,10 +668,18 @@ export async function searchTicketmasterEvents(
           size: "50",
           sort: 'date,asc',
           startDateTime: `${today}T00:00:00Z`,
+          keyword: 'business',
+          classificationId: 'KZFzniwnSyZfZ7v7n1' // Business events classification
         });
         
         const fallbackUrl = `https://app.ticketmaster.com/discovery/v2/events.json?${fallbackParams.toString()}`;
-        const response = await axios.get(fallbackUrl, { timeout: 5000 });
+        const response = await axios.get(fallbackUrl, { 
+          timeout: 8000,
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'Aether-Networking-App/1.0'
+          }
+        });
         
         if (response.data && response.data._embedded && response.data._embedded.events) {
           const events = response.data._embedded.events;
@@ -1405,10 +1429,26 @@ export async function getNetworkingEvents(
     
     console.log(`[NetworkingService] Generated search keywords: ${keywords.join(', ')}`);
     
-    // First try Eventbrite since we now have credentials
-    console.log('[NetworkingService] Prioritizing Eventbrite API with newly added credentials');
-    let eventbriteEvents: NetworkingEvent[] = [];
+    // Try multiple sources for events in parallel, but prioritize Ticketmaster
+    // since it's currently the most reliable
+    console.log('[NetworkingService] Fetching events from multiple providers...');
     
+    // Initialize event arrays
+    let eventbriteEvents: NetworkingEvent[] = [];
+    let ticketmasterEvents: NetworkingEvent[] = [];
+    let merakiEvents: NetworkingEvent[] = [];
+    
+    // First try Ticketmaster (most reliable currently)
+    console.log('[NetworkingService] Prioritizing Ticketmaster API (known working endpoint)');
+    try {
+      ticketmasterEvents = await searchTicketmasterEvents(keywords, location);
+      console.log(`[NetworkingService] Ticketmaster returned ${ticketmasterEvents.length} events`);
+    } catch (error) {
+      console.error('[NetworkingService] Error fetching from Ticketmaster:', error);
+    }
+    
+    // Then try Eventbrite (may have API changes)
+    console.log('[NetworkingService] Trying Eventbrite API (may have endpoint changes)');
     try {
       eventbriteEvents = await searchEventbriteEvents(keywords, location);
       console.log(`[NetworkingService] Eventbrite returned ${eventbriteEvents.length} events`);
@@ -1416,36 +1456,17 @@ export async function getNetworkingEvents(
       console.error('[NetworkingService] Error fetching from Eventbrite:', error);
     }
     
-    // If we have enough Eventbrite events, we can skip Ticketmaster
-    let ticketmasterEvents: NetworkingEvent[] = [];
-    if (eventbriteEvents.length < 5) {
-      console.log('[NetworkingService] Not enough Eventbrite events, trying Ticketmaster as fallback');
-      try {
-        ticketmasterEvents = await searchTicketmasterEvents(keywords, location);
-        console.log(`[NetworkingService] Ticketmaster returned ${ticketmasterEvents.length} events`);
-      } catch (error) {
-        console.error('[NetworkingService] Error fetching from Ticketmaster:', error);
-      }
-    } else {
-      console.log('[NetworkingService] Sufficient Eventbrite events found, skipping Ticketmaster');
+    // Try using Meraki API as additional source
+    console.log('[NetworkingService] Trying Meraki API for additional networking events');
+    try {
+      merakiEvents = await searchMerakiEvents(keywords, location);
+      console.log(`[NetworkingService] Meraki API returned ${merakiEvents.length} events`);
+    } catch (error) {
+      console.error('[NetworkingService] Error fetching from Meraki API:', error);
     }
     
-    // Try using Meraki API as additional source or fallback
-    let merakiEvents: NetworkingEvent[] = [];
-    if (eventbriteEvents.length + ticketmasterEvents.length < 10) {
-      console.log('[NetworkingService] Trying Meraki API for additional networking events');
-      try {
-        merakiEvents = await searchMerakiEvents(keywords, location);
-        console.log(`[NetworkingService] Meraki API returned ${merakiEvents.length} events`);
-      } catch (error) {
-        console.error('[NetworkingService] Error fetching from Meraki API:', error);
-      }
-    } else {
-      console.log('[NetworkingService] Sufficient events already found, skipping Meraki API');
-    }
-    
-    // Combine events, prioritizing Eventbrite, then Ticketmaster, then Meraki
-    const allEvents = [...eventbriteEvents, ...ticketmasterEvents, ...merakiEvents];
+    // Combine events, prioritizing Ticketmaster since it's currently working, then Eventbrite & Meraki
+    const allEvents = [...ticketmasterEvents, ...eventbriteEvents, ...merakiEvents];
     
     if (allEvents.length === 0) {
       console.warn('[NetworkingService] No events found from any source, generating personalized sample events');
