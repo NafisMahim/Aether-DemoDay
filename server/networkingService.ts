@@ -212,46 +212,89 @@ export async function searchEventbriteEvents(
     params.append('start_date.range_start', today);
     
     // Build the URL with search parameters
-    const searchUrl = `https://www.eventbriteapi.com/v3/events/search?${params.toString()}`;
+    // Ensure we're using a supported endpoint that exists
+    const searchUrl = `https://www.eventbriteapi.com/v3/events/search/?${params.toString()}`;
     console.log(`[Eventbrite] Searching with URL: ${searchUrl}`);
     
-    // Make the API request
+    // Make the API request with detailed headers
+    console.log(`[Eventbrite] Making request to ${searchUrl}`);
+    
+    const headers = {
+      'Authorization': `Bearer ${EVENTBRITE_TOKEN}`,
+      'Accept': 'application/json',
+      'Content-Type': 'application/json'
+    };
+    
+    console.log(`[Eventbrite] Using headers:`, JSON.stringify(headers, (key, value) => 
+      key === 'Authorization' ? 'Bearer ***' : value, 2));
+    
     const response = await axios.get(searchUrl, {
-      headers: {
-        'Authorization': `Bearer ${EVENTBRITE_TOKEN}`
-      },
-      timeout: 8000,
-      validateStatus: (status) => status < 500 // Accept any status code less than 500
+      headers,
+      timeout: 12000, // Increase timeout for more reliability
+      validateStatus: (status) => true // Accept any status code to properly handle errors
     });
     
-    // Check if the response contains an error
-    if (response.data && response.data.error) {
-      console.error(`[Eventbrite] Search API Error: ${response.data.error} - ${response.data.error_description}`);
+    // Log detailed response information
+    console.log(`[Eventbrite] Response status: ${response.status}`);
+    
+    // Check for HTTP errors
+    if (response.status >= 400) {
+      console.error(`[Eventbrite] HTTP Error: ${response.status} - ${response.statusText}`);
+      console.error(`[Eventbrite] Response data:`, JSON.stringify(response.data || {}, null, 2));
       
-      // Try fallback search without category filters if the first attempt failed
-      try {
-        console.log('[Eventbrite] Trying simplified fallback search...');
-        const simplifiedParams = new URLSearchParams();
-        simplifiedParams.append('q', 'business conference networking');
-        
-        const fallbackUrl = `https://www.eventbriteapi.com/v3/events/search?${simplifiedParams.toString()}`;
-        
-        const fallbackResponse = await axios.get(fallbackUrl, {
-          headers: {
-            'Authorization': `Bearer ${EVENTBRITE_TOKEN}`
-          },
-          timeout: 8000,
-          validateStatus: (status) => status < 500
-        });
-        
-        if (fallbackResponse.data && fallbackResponse.data.events && Array.isArray(fallbackResponse.data.events)) {
-          console.log(`[Eventbrite] Fallback search found ${fallbackResponse.data.events.length} events`);
-          return processEventbriteEvents(fallbackResponse.data.events);
-        }
-      } catch (fallbackError) {
-        console.error('[Eventbrite] Fallback search also failed:', fallbackError);
+      // Special handling for common error codes
+      if (response.status === 401) {
+        console.error('[Eventbrite] Authentication error - invalid token');
+      } else if (response.status === 404) {
+        console.error('[Eventbrite] Resource not found - potentially invalid endpoint');
+      } else if (response.status === 429) {
+        console.error('[Eventbrite] Rate limit exceeded');
       }
       
+      // Try simplified fallback search 
+      try {
+        console.log('[Eventbrite] Trying simplified fallback search with minimal parameters...');
+        const simplifiedParams = new URLSearchParams();
+        
+        // Use very basic search terms to maximize chance of success
+        simplifiedParams.append('q', 'conference');
+        
+        // Add date filter for future events
+        const today = new Date().toISOString().split('T')[0];
+        simplifiedParams.append('start_date.range_start', today);
+        
+        const fallbackUrl = `https://www.eventbriteapi.com/v3/events/search/?${simplifiedParams.toString()}`;
+        console.log(`[Eventbrite] Fallback URL: ${fallbackUrl}`);
+        
+        const fallbackResponse = await axios.get(fallbackUrl, {
+          headers,
+          timeout: 12000,
+          validateStatus: (status) => true
+        });
+        
+        console.log(`[Eventbrite] Fallback response status: ${fallbackResponse.status}`);
+        
+        if (fallbackResponse.status === 200 && 
+            fallbackResponse.data && 
+            fallbackResponse.data.events && 
+            Array.isArray(fallbackResponse.data.events)) {
+          console.log(`[Eventbrite] Fallback search found ${fallbackResponse.data.events.length} events`);
+          return processEventbriteEvents(fallbackResponse.data.events);
+        } else {
+          console.error(`[Eventbrite] Fallback search failed with status ${fallbackResponse.status}`);
+          console.log(`[Eventbrite] Fallback response keys:`, 
+            Object.keys(fallbackResponse.data || {}).join(', '));
+        }
+      } catch (fallbackError: any) {
+        console.error('[Eventbrite] Fallback search also failed:', fallbackError.message);
+      }
+      
+      return [];
+    }
+    
+    // Check if the response contains an API error
+    if (response.data && response.data.error) {
+      console.error(`[Eventbrite] API Error: ${response.data.error} - ${response.data.error_description}`);
       return [];
     }
     
