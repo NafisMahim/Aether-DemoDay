@@ -1193,6 +1193,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get user quiz results if authenticated - simplified version to avoid API errors
       let personalityMsg = "";
       let careerMsg = "";
+      let personalityDetails = null;
       
       if (req.isAuthenticated() && req.user) {
         try {
@@ -1200,6 +1201,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const quizResults = await storage.getQuizResults(userId);
           
           if (quizResults) {
+            // Save full personality details for special queries
+            personalityDetails = quizResults;
+            
             if (quizResults.primaryType && quizResults.primaryType.name) {
               personalityMsg = `Based on your ${quizResults.primaryType.name} personality type, `;
             }
@@ -1305,7 +1309,43 @@ Now, please respond to this user message: ${message}`;
         }
       }
       
-      // Generate response
+      // Special case: If user is asking about their personality analysis from quiz
+      const personalityQuestionPattern = /(what does my (personality|quiz|assessment)|tell me about my (personality|profile|type)|what (personality|type) am i|my (quiz|personality) result)/i;
+      
+      if (personalityQuestionPattern.test(message)) {
+        // If the user is asking about personality but we don't have their details (not logged in or no quiz results)
+        if (!personalityDetails) {
+          return res.status(200).json({
+            success: true,
+            response: "I can't access your personality analysis. Please make sure you're logged in and have completed the career quiz. You can take the quiz from the Home tab."
+          });
+        }
+        // Generate a custom response for personality analysis questions
+        let personalityResponse = "Based on your quiz results, ";
+        
+        if (personalityDetails.primaryType && personalityDetails.primaryType.name) {
+          personalityResponse += `your primary personality type is ${personalityDetails.primaryType.name}`;
+          
+          if (personalityDetails.secondaryType && personalityDetails.secondaryType.name) {
+            personalityResponse += ` with a secondary ${personalityDetails.secondaryType.name} dimension`;
+          }
+          
+          personalityResponse += ". ";
+          
+          if (personalityDetails.strengths && personalityDetails.strengths.length > 0) {
+            personalityResponse += `Your top strength is in ${personalityDetails.strengths[0]}.`;
+          }
+        } else {
+          personalityResponse += "you demonstrate a balanced profile with multiple strengths. Take the quiz again for more detailed insights.";
+        }
+        
+        return res.status(200).json({
+          success: true,
+          response: personalityResponse
+        });
+      }
+      
+      // Standard response for other questions
       const result = await chat.sendMessage(enhancedMessage);
       const response = await result.response;
       const text = response.text();
