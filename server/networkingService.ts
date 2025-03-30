@@ -280,14 +280,46 @@ export async function searchTicketmasterEvents(
   location?: string
 ): Promise<NetworkingEvent[]> {
   try {
-    // Join keywords for search query
-    const keyword = interestKeywords.join(' OR ');
+    // Extract shorter, more focused keywords for better results
+    // Instead of using full job titles, extract core concepts
+    const simplifiedKeywords = interestKeywords
+      .map(kw => {
+        // Extract key terms from longer phrases
+        const parts = kw.split(/[\/\s,]+/);
+        // Filter out words that are too short or common
+        return parts
+          .filter(part => part.length > 3 && !['and', 'the', 'for', 'you', 'are', 'skilled', 'your'].includes(part.toLowerCase()))
+          .slice(0, 2); // Take only first two significant words from each phrase
+      })
+      .flat()
+      // Add some networking-specific terms
+      .concat(['networking', 'conference', 'professional', 'workshop', 'business']);
     
-    // Base URL for Ticketmaster API
-    let url = `https://app.ticketmaster.com/discovery/v2/events.json?keyword=${encodeURIComponent(keyword)}&apikey=${TICKETMASTER_KEY}`;
+    // Deduplicate
+    const uniqueKeywords = [...new Set(simplifiedKeywords)];
+    
+    // Take only the most relevant 5 keywords to avoid overloading the query
+    const searchTerms = uniqueKeywords.slice(0, 5);
+    
+    console.log(`[Ticketmaster] Using simplified search terms: ${searchTerms.join(', ')}`);
+    
+    // Create a more targeted search query
+    // Use size parameter to get more results
+    let url = `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${TICKETMASTER_KEY}&size=50&sort=date,asc`;
+    
+    // Add classificationName to focus on business/conference events
+    url += '&classificationName=conference,meeting,business,networking,workshop';
+    
+    // Add keyword searching
+    if (searchTerms.length > 0) {
+      // Use individual keyword parameters for better results
+      searchTerms.forEach(term => {
+        url += `&keyword=${encodeURIComponent(term)}`;
+      });
+    }
     
     // Add location parameter if provided
-    if (location) {
+    if (location && location !== 'Not specified') {
       url += `&city=${encodeURIComponent(location)}`;
     }
     
@@ -301,77 +333,31 @@ export async function searchTicketmasterEvents(
     // Check for errors in the response
     if (response.status !== 200) {
       console.error(`[Ticketmaster] API Error: Status ${response.status}`);
+      
+      // Try a simpler backup search if the first one fails
+      try {
+        console.log('[Ticketmaster] Trying simpler backup search');
+        const backupUrl = `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${TICKETMASTER_KEY}&size=30&classificationName=business`;
+        
+        const backupResponse = await axios.get(backupUrl, {
+          validateStatus: (status) => status < 500
+        });
+        
+        if (backupResponse.status === 200 && backupResponse.data._embedded && backupResponse.data._embedded.events) {
+          console.log(`[Ticketmaster] Backup search successful, found ${backupResponse.data._embedded.events.length} events`);
+          return processTicketmasterEvents(backupResponse.data._embedded.events);
+        }
+      } catch (backupError) {
+        console.error('[Ticketmaster] Backup search failed:', backupError);
+      }
+      
       return [];
     }
     
     // Map Ticketmaster events to standardized format
     if (response.data && response.data._embedded && response.data._embedded.events) {
       console.log(`[Ticketmaster] Successfully fetched ${response.data._embedded.events.length} events`);
-      return response.data._embedded.events.map((event: TicketmasterEvent) => {
-        // Extract venue information
-        const venue = event._embedded?.venues?.[0];
-        
-        // Determine event type based on Ticketmaster classification
-        let type: NetworkingEvent['type'] = "other";
-        const segment = event.classifications?.[0]?.segment?.name?.toLowerCase() || '';
-        
-        if (segment.includes('conference') || segment.includes('business')) {
-          type = "conference";
-        } else if (segment.includes('workshop') || segment.includes('learning')) {
-          type = "workshop";
-        } else if (segment.includes('music') || segment.includes('concert')) {
-          type = "concert";
-        } else if (segment.includes('sports')) {
-          type = "sporting";
-        } else if (segment.includes('networking')) {
-          type = "networking";
-        } else if (segment.includes('meetup')) {
-          type = "meetup";
-        }
-        
-        // Extract categories
-        const categories: string[] = [];
-        if (event.classifications?.[0]?.segment?.name) {
-          categories.push(event.classifications[0].segment.name);
-        }
-        if (event.classifications?.[0]?.genre?.name) {
-          categories.push(event.classifications[0].genre.name);
-        }
-        
-        // Extract date and time
-        const dateObj = event.dates?.start ? new Date(event.dates.start.dateTime) : new Date();
-        const date = event.dates?.start?.localDate || dateObj.toISOString().split('T')[0];
-        const time = event.dates?.start?.localTime || dateObj.toISOString().split('T')[1]?.substring(0, 5);
-        
-        // Find the best image (prefer larger images)
-        let image: string | undefined;
-        if (event.images && event.images.length > 0) {
-          // Sort by size (width × height) and take the largest
-          const sortedImages = [...event.images].sort((a, b) => 
-            (b.width * b.height) - (a.width * a.height)
-          );
-          image = sortedImages[0].url;
-        }
-        
-        // Map to standardized event format
-        return {
-          id: event.id,
-          title: event.name,
-          description: event.description || event.info || 'No description available',
-          date,
-          time,
-          venue: venue?.name,
-          location: venue?.address?.line1,
-          city: venue?.city?.name,
-          state: venue?.state?.name,
-          country: venue?.country?.name,
-          url: event.url,
-          type,
-          categories,
-          source: "ticketmaster",
-          image
-        };
-      });
+      return processTicketmasterEvents(response.data._embedded.events);
     }
     
     return [];
@@ -379,6 +365,75 @@ export async function searchTicketmasterEvents(
     console.error('Error fetching Ticketmaster events:', error);
     return [];
   }
+}
+
+// Helper function to process Ticketmaster events
+function processTicketmasterEvents(events: TicketmasterEvent[]): NetworkingEvent[] {
+  return events.map((event: TicketmasterEvent) => {
+    // Extract venue information
+    const venue = event._embedded?.venues?.[0];
+    
+    // Determine event type based on Ticketmaster classification
+    let type: NetworkingEvent['type'] = "other";
+    const segment = event.classifications?.[0]?.segment?.name?.toLowerCase() || '';
+    
+    if (segment.includes('conference') || segment.includes('business')) {
+      type = "conference";
+    } else if (segment.includes('workshop') || segment.includes('learning')) {
+      type = "workshop";
+    } else if (segment.includes('music') || segment.includes('concert')) {
+      type = "concert";
+    } else if (segment.includes('sports')) {
+      type = "sporting";
+    } else if (segment.includes('networking')) {
+      type = "networking";
+    } else if (segment.includes('meetup')) {
+      type = "meetup";
+    }
+    
+    // Extract categories
+    const categories: string[] = [];
+    if (event.classifications?.[0]?.segment?.name) {
+      categories.push(event.classifications[0].segment.name);
+    }
+    if (event.classifications?.[0]?.genre?.name) {
+      categories.push(event.classifications[0].genre.name);
+    }
+    
+    // Extract date and time
+    const dateObj = event.dates?.start ? new Date(event.dates.start.dateTime) : new Date();
+    const date = event.dates?.start?.localDate || dateObj.toISOString().split('T')[0];
+    const time = event.dates?.start?.localTime || dateObj.toISOString().split('T')[1]?.substring(0, 5);
+    
+    // Find the best image (prefer larger images)
+    let image: string | undefined;
+    if (event.images && event.images.length > 0) {
+      // Sort by size (width × height) and take the largest
+      const sortedImages = [...event.images].sort((a, b) => 
+        (b.width * b.height) - (a.width * a.height)
+      );
+      image = sortedImages[0].url;
+    }
+    
+    // Map to standardized event format
+    return {
+      id: event.id,
+      title: event.name,
+      description: event.description || event.info || 'No description available',
+      date,
+      time,
+      venue: venue?.name,
+      location: venue?.address?.line1,
+      city: venue?.city?.name,
+      state: venue?.state?.name,
+      country: venue?.country?.name,
+      url: event.url,
+      type,
+      categories,
+      source: "ticketmaster",
+      image
+    };
+  });
 }
 
 /**
