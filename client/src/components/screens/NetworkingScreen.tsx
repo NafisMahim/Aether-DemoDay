@@ -641,65 +641,53 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
             ) : (
               <div className="grid gap-4">
                 {filteredOpportunities.map((opportunity) => (
-                  <Card key={opportunity.id} className="overflow-hidden flex flex-col">
-                    <CardHeader className="pb-2">
+                  <Card key={opportunity.id} className="overflow-hidden">
+                    <CardHeader className="pb-2 pt-4">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-2">
                           {getOpportunityIcon(opportunity.type)}
-                          <CardTitle className="text-base">{opportunity.title}</CardTitle>
+                          <CardTitle className="text-base truncate max-w-[70%]">{opportunity.title}</CardTitle>
                         </div>
                         <Badge className="whitespace-nowrap">{opportunity.industry}</Badge>
                       </div>
-                      {opportunity.date && (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                          <Calendar className="h-3 w-3" />
-                          <span>{opportunity.date}</span>
-                        </div>
-                      )}
                     </CardHeader>
                     
                     <CardContent className="pb-2">
-                      <div className="text-sm text-muted-foreground mb-3">
+                      <div className="text-sm text-muted-foreground mb-3 line-clamp-2">
                         {opportunity.description}
                       </div>
                       
-                      {opportunity.location && (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground mb-3">
-                          <Building className="h-3 w-3 flex-shrink-0" />
-                          <span>{opportunity.location}</span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Calendar className="h-3 w-3" />
+                          <span>{opportunity.date || 'Date TBA'}</span>
                         </div>
-                      )}
-                      
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {opportunity.tags.slice(0, 3).map((tag, idx) => (
-                          <Badge key={idx} variant="outline" className="text-xs">
-                            {tag}
-                          </Badge>
-                        ))}
+                        
+                        {opportunity.location && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground truncate max-w-[50%]">
+                            <Building className="h-3 w-3 flex-shrink-0" />
+                            <span className="truncate">{opportunity.location}</span>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                     
-                    <CardFooter className="flex items-center justify-between pt-2 gap-2">
-                      <div className="flex items-center gap-1.5">
+                    <CardFooter className="flex items-center justify-between pt-2 pb-4">
+                      <div className="flex items-center gap-1">
                         <span className="text-xs font-medium">
-                          {opportunity.relevanceScore}% Relevant
+                          {opportunity.relevanceScore}%
                         </span>
-                        <Progress 
-                          value={opportunity.relevanceScore} 
-                          className="h-1.5 w-24" 
-                        />
                       </div>
                       
                       <div className="flex gap-2">
                         <Button 
                           variant="default" 
                           size="sm" 
-                          className="text-xs h-8 gap-1"
+                          className="text-xs h-8"
                           asChild
                         >
                           <a href={opportunity.url} target="_blank" rel="noopener noreferrer">
                             <span>Apply</span>
-                            <ExternalLink className="h-3 w-3" />
                           </a>
                         </Button>
                         
@@ -710,7 +698,7 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
                           asChild
                         >
                           <a href={opportunity.url} target="_blank" rel="noopener noreferrer">
-                            <span>More Info</span>
+                            <span>More</span>
                           </a>
                         </Button>
                       </div>
@@ -754,7 +742,7 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
               <div className="grid gap-4">
                 {filteredCards.map((card) => (
                   <Card key={card.id}>
-                    <CardHeader className="pb-2">
+                    <CardHeader className="pb-2 pt-4">
                       <div className="flex justify-between">
                         <div className="flex items-center gap-3">
                           <Avatar>
@@ -766,9 +754,9 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <CardTitle className="text-base">{card.name}</CardTitle>
-                            <CardDescription className="text-xs">
-                              {card.title} at {card.company}
+                            <CardTitle className="text-base truncate">{card.name}</CardTitle>
+                            <CardDescription className="text-xs truncate">
+                              {card.title} • {card.company}
                             </CardDescription>
                           </div>
                         </div>
@@ -792,14 +780,11 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
                         </div>
                       </div>
                     </CardHeader>
-                    <CardContent className="space-y-2">
-                      {card.tagline && (
-                        <p className="text-sm italic text-muted-foreground">"{card.tagline}"</p>
-                      )}
-                      <div className="grid gap-1.5">
+                    <CardContent className="pb-2">
+                      <div className="flex flex-wrap gap-3">
                         <div className="flex items-center gap-2 text-sm">
                           <Mail className="h-4 w-4 text-muted-foreground" />
-                          <span>{card.email}</span>
+                          <span className="truncate">{card.email}</span>
                         </div>
                         {card.phone && (
                           <div className="flex items-center gap-2 text-sm">
@@ -807,25 +792,20 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
                             <span>{card.phone}</span>
                           </div>
                         )}
-                        {card.website && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Globe className="h-4 w-4 text-muted-foreground" />
-                            <span>{card.website}</span>
-                          </div>
-                        )}
-                        {card.linkedin && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Linkedin className="h-4 w-4 text-muted-foreground" />
-                            <span>{card.linkedin}</span>
-                          </div>
-                        )}
                       </div>
                     </CardContent>
-                    <CardFooter className="pt-0">
+                    <CardFooter className="pt-2 pb-4 flex justify-between">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="px-2"
+                      >
+                        <span>View Full</span>
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
-                        className="w-full gap-1"
+                        className="gap-1"
                       >
                         <DownloadCloud className="h-4 w-4" />
                         <span>Download</span>
@@ -1024,9 +1004,9 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
                           <CardHeader className="p-4 pb-2">
                             <div className="flex justify-between items-start">
                               <div>
-                                <CardTitle className="text-base">{section.title}</CardTitle>
+                                <CardTitle className="text-base truncate max-w-[80%]">{section.title}</CardTitle>
                                 {section.organization && (
-                                  <CardDescription className="text-xs mt-0.5">
+                                  <CardDescription className="text-xs mt-0.5 truncate max-w-[90%]">
                                     {section.organization} {section.date ? `• ${section.date}` : ''}
                                   </CardDescription>
                                 )}
@@ -1052,14 +1032,19 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
                             </div>
                           </CardHeader>
                           <CardContent className="p-4 pt-2 text-sm">
-                            <p className="text-muted-foreground mb-2">
+                            <p className="text-muted-foreground mb-2 line-clamp-2">
                               {section.description}
                             </p>
                             {section.bullets && section.bullets.length > 0 && (
-                              <ul className="space-y-1 pl-5 list-disc">
-                                {section.bullets.map((bullet, idx) => (
-                                  <li key={idx}>{bullet}</li>
+                              <ul className="pl-5 list-disc">
+                                {section.bullets.slice(0, 2).map((bullet, idx) => (
+                                  <li key={idx} className="truncate">{bullet}</li>
                                 ))}
+                                {section.bullets.length > 2 && (
+                                  <li className="text-muted-foreground">
+                                    + {section.bullets.length - 2} more...
+                                  </li>
+                                )}
                               </ul>
                             )}
                           </CardContent>
