@@ -25,6 +25,7 @@ import PrivacySecurityScreen from "./screens/PrivacySecurityScreen"
 import NotificationSettingsScreen from "./screens/NotificationSettingsScreen"
 import InternshipsScreen from "./screens/InternshipsScreen"
 import ChatbotScreen from "./screens/ChatbotScreen"
+import NetworkingScreen from "./screens/NetworkingScreen"
 
 // Main App Component
 export default function AetherApp() {
@@ -48,6 +49,7 @@ export default function AetherApp() {
     | "notificationSettings"
     | "internships"
     | "chatbot"
+    | "networking"
   >("login")
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
@@ -589,6 +591,7 @@ export default function AetherApp() {
                 })
               }}
               navigateTo={navigateTo}
+              quizResults={quizResults}
             />
           ) : currentScreen === "experience" ? (
             <ExperienceScreen handleBack={handleBack} />
@@ -731,6 +734,11 @@ export default function AetherApp() {
           ) : currentScreen === "chatbot" ? (
             <ChatbotScreen 
               handleBack={handleBack}
+            />
+          ) : currentScreen === "networking" ? (
+            <NetworkingScreen
+              handleBack={handleBack}
+              quizResults={quizResults}
             />
           ) : (
             <ComingSoonScreen screen={currentScreen} handleBack={handleBack} />

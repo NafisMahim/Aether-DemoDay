@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
+import { Users, Sparkles } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -26,9 +27,10 @@ interface InterestsScreenProps {
     interests: Interest[]
   }>>
   navigateTo?: (page: string) => void
+  quizResults?: any
 }
 
-export default function InterestsScreen({ handleBack, interests, setUserData, navigateTo = () => {} }: InterestsScreenProps) {
+export default function InterestsScreen({ handleBack, interests, setUserData, navigateTo = () => {}, quizResults }: InterestsScreenProps) {
   const { toast } = useToast()
   const [newInterest, setNewInterest] = useState("")
   const [userInterests, setUserInterests] = useState<Interest[]>(interests)
@@ -110,6 +112,18 @@ export default function InterestsScreen({ handleBack, interests, setUserData, na
       navigateTo("internships")
     }
   }
+  
+  // Handle clicking the networking button
+  const handleNetworkingClick = () => {
+    // Check if quiz is completed (for personalized suggestions)
+    if (!isQuizCompleted) {
+      // Show prompt dialog
+      setShowQuizPrompt(true)
+    } else {
+      // Navigate to networking page
+      navigateTo("networking")
+    }
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -139,28 +153,47 @@ export default function InterestsScreen({ handleBack, interests, setUserData, na
         {/* Career Opportunities Section */}
         <div className="mb-6">
           <h2 className="text-lg font-bold mb-3">Career Opportunities</h2>
-          <Button
-            onClick={handleInternshipClick}
-            className="w-full bg-purple-500 hover:bg-purple-600 flex items-center justify-center"
-          >
-            <svg 
-              className="w-5 h-5 mr-2" 
-              fill="none" 
-              stroke="currentColor" 
-              viewBox="0 0 24 24" 
-              xmlns="http://www.w3.org/2000/svg"
+          <div className="grid grid-cols-1 gap-3">
+            <Button
+              onClick={handleInternshipClick}
+              className="w-full bg-purple-500 hover:bg-purple-600 flex items-center justify-center"
             >
-              <path 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                strokeWidth="2" 
-                d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-              ></path>
-            </svg>
-            Find Internships
-          </Button>
+              <svg 
+                className="w-5 h-5 mr-2" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24" 
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  strokeWidth="2" 
+                  d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                ></path>
+              </svg>
+              Find Internships
+            </Button>
+            
+            {/* Networking Assistant Button - Styling with red and blue hues */}
+            <Button
+              onClick={handleNetworkingClick}
+              className="w-full relative flex items-center justify-center overflow-hidden group"
+              style={{
+                background: "linear-gradient(135deg, #ff3366 0%, #6666ff 100%)",
+                boxShadow: "0 4px 15px rgba(255, 51, 102, 0.3), 0 4px 15px rgba(102, 102, 255, 0.3)"
+              }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-red-500 opacity-0 group-hover:opacity-30 transition-opacity duration-300"></div>
+              <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 to-blue-600/10 animate-pulse"></div>
+              
+              <Users className="w-5 h-5 mr-2 relative z-10" />
+              <span className="relative z-10">Virtual Networking Assistant</span>
+              <Sparkles className="w-4 h-4 ml-2 relative z-10 animate-[pulse_2s_ease-in-out_infinite]" />
+            </Button>
+          </div>
           <p className="text-xs text-gray-500 mt-2 text-center">
-            Discover opportunities matching your interests and skills
+            Connect with others in your field and discover career opportunities
           </p>
         </div>
         
