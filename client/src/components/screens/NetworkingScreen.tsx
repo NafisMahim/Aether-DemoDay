@@ -52,6 +52,7 @@ interface NetworkingOpportunity {
   tags: string[]
   location?: string
   date?: string
+  image?: string
 }
 
 // Types for resume sections
@@ -226,96 +227,115 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
 
   // Convert API events to NetworkingOpportunity format
   const networkingOpportunities = useMemo(() => {
-    // Default to empty array if no data or error
-    if (!networkingData?.events || networkingData.events.length === 0) {
-      return [
-        {
-          id: "net1",
-          title: "Tech Innovators Meetup",
-          type: "conference",
-          description: "Monthly gathering of tech professionals discussing emerging technologies and industry trends.",
-          url: "https://meetup.com/tech-innovators",
-          relevanceScore: 92,
-          industry: "Technology",
-          tags: ["Technology", "Innovation", "Networking"]
-        },
-        {
-          id: "net2",
-          title: "Women in Design Community",
-          type: "community",
-          description: "Supportive community for women in design to share resources, mentorship, and job opportunities.",
-          url: "https://discord.gg/women-in-design",
-          relevanceScore: 85,
-          industry: "Design",
-          tags: ["Design", "Community", "Mentorship"]
-        },
-        {
-          id: "net3",
-          title: "Product Management Fellowship",
-          type: "program",
-          description: "Six-month fellowship connecting early-career product managers with industry mentors and resources.",
-          url: "https://productfellowship.org",
-          relevanceScore: 78,
-          industry: "Product",
-          tags: ["Product Management", "Leadership", "Career Development"]
-        },
-        {
-          id: "net4",
-          title: "Creative Industries Mentorship",
-          type: "mentorship",
-          description: "Structured mentorship program pairing creative professionals with industry leaders.",
-          url: "https://creativementorship.org",
-          relevanceScore: 89,
-          industry: "Creative",
-          tags: ["Creative", "Mentorship", "Career Development"],
-          date: "Applications open May 1, 2025"
-        },
-        {
-          id: "net5",
-          title: "Young Leaders Network",
-          type: "organization",
-          description: "Organization for early-career professionals focused on leadership development and networking.",
-          url: "https://youngleadersnetwork.org",
-          relevanceScore: 75,
-          industry: "Cross-industry",
-          tags: ["Leadership", "Networking", "Professional Development"]
+    // If we have actual events from the API, use those
+    if (networkingData?.events && networkingData.events.length > 0) {
+      console.log("Processing API networking events:", networkingData.events.length);
+      
+      // Convert API events to our NetworkingOpportunity format
+      return networkingData.events.map(event => {
+        // Map event type to appropriate NetworkingOpportunity type
+        let opportunityType: NetworkingOpportunity['type'] = "conference";
+        
+        if (event.type === "workshop") {
+          opportunityType = "program";
+        } else if (event.type === "meetup" || event.type === "networking") {
+          opportunityType = "community";
+        } else if (event.type === "other") {
+          opportunityType = "organization";
         }
-      ]
+        
+        // Determine industry from categories or source
+        let industry = event.categories && event.categories.length > 0
+          ? event.categories[0]
+          : event.source === "eventbrite" 
+            ? "Professional" 
+            : "Entertainment";
+            
+        // Format date if available
+        let formattedDate = event.date;
+        if (event.date) {
+          try {
+            const dateObj = new Date(event.date);
+            formattedDate = dateObj.toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric'
+            });
+          } catch (e) {
+            // Use original date string if parsing fails
+          }
+        }
+        
+        return {
+          id: event.id,
+          title: event.title,
+          type: opportunityType,
+          description: event.description,
+          url: event.url,
+          relevanceScore: event.relevanceScore || 75,
+          industry: industry,
+          tags: event.categories || [],
+          location: [event.venue, event.city, event.state].filter(Boolean).join(', '),
+          date: formattedDate,
+          image: event.image
+        } as NetworkingOpportunity;
+      }).sort((a, b) => b.relevanceScore - a.relevanceScore);
     }
-
-    // Convert API events to our NetworkingOpportunity format
-    return networkingData.events.map(event => {
-      // Map event type to appropriate NetworkingOpportunity type
-      let opportunityType: NetworkingOpportunity['type'] = "conference";
-      
-      if (event.type === "workshop") {
-        opportunityType = "program";
-      } else if (event.type === "meetup" || event.type === "networking") {
-        opportunityType = "community";
-      } else if (event.type === "other") {
-        opportunityType = "organization";
+    
+    // Default events if no data from API
+    return [
+      {
+        id: "net1",
+        title: "Tech Innovators Meetup",
+        type: "conference",
+        description: "Monthly gathering of tech professionals discussing emerging technologies and industry trends.",
+        url: "https://meetup.com/tech-innovators",
+        relevanceScore: 92,
+        industry: "Technology",
+        tags: ["Technology", "Innovation", "Networking"]
+      },
+      {
+        id: "net2",
+        title: "Women in Design Community",
+        type: "community",
+        description: "Supportive community for women in design to share resources, mentorship, and job opportunities.",
+        url: "https://discord.gg/women-in-design",
+        relevanceScore: 85,
+        industry: "Design",
+        tags: ["Design", "Community", "Mentorship"]
+      },
+      {
+        id: "net3",
+        title: "Product Management Fellowship",
+        type: "program",
+        description: "Six-month fellowship connecting early-career product managers with industry mentors and resources.",
+        url: "https://productfellowship.org",
+        relevanceScore: 78,
+        industry: "Product",
+        tags: ["Product Management", "Leadership", "Career Development"]
+      },
+      {
+        id: "net4",
+        title: "Creative Industries Mentorship",
+        type: "mentorship",
+        description: "Structured mentorship program pairing creative professionals with industry leaders.",
+        url: "https://creativementorship.org",
+        relevanceScore: 89,
+        industry: "Creative",
+        tags: ["Creative", "Mentorship", "Career Development"],
+        date: "Applications open May 1, 2025"
+      },
+      {
+        id: "net5",
+        title: "Young Leaders Network",
+        type: "organization",
+        description: "Organization for early-career professionals focused on leadership development and networking.",
+        url: "https://youngleadersnetwork.org",
+        relevanceScore: 75,
+        industry: "Cross-industry",
+        tags: ["Leadership", "Networking", "Professional Development"]
       }
-      
-      // Determine industry from categories or source
-      let industry = event.categories && event.categories.length > 0
-        ? event.categories[0]
-        : event.source === "eventbrite" 
-          ? "Professional" 
-          : "Entertainment";
-      
-      return {
-        id: event.id,
-        title: event.title,
-        type: opportunityType,
-        description: event.description,
-        url: event.url,
-        relevanceScore: event.relevanceScore || 75,
-        industry: industry,
-        tags: event.categories || [],
-        location: [event.venue, event.city, event.state].filter(Boolean).join(', '),
-        date: event.date
-      } as NetworkingOpportunity;
-    }).sort((a, b) => b.relevanceScore - a.relevanceScore);
+    ];
   }, [networkingData])
   
   // Filtered networking opportunities based on search
@@ -614,36 +634,57 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
                 {filteredOpportunities.map((opportunity) => (
                   <Card key={opportunity.id} className="overflow-hidden">
                     <CardHeader className="pb-2">
-                      <div className="flex justify-between items-start">
+                      <div className="flex items-start justify-between">
                         <div className="flex items-center gap-2">
                           {getOpportunityIcon(opportunity.type)}
                           <CardTitle className="text-base">{opportunity.title}</CardTitle>
                         </div>
-                        <Badge variant="secondary" className="text-xs">
-                          {opportunity.industry}
-                        </Badge>
+                        <Badge>{opportunity.industry}</Badge>
                       </div>
-                      <CardDescription className="text-xs">
-                        {opportunity.type.charAt(0).toUpperCase() + opportunity.type.slice(1)}
-                        {opportunity.date && ` • ${opportunity.date}`}
-                      </CardDescription>
+                      {opportunity.date && (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                          <Calendar className="h-3 w-3" />
+                          <span>{opportunity.date}</span>
+                        </div>
+                      )}
                     </CardHeader>
-                    <CardContent className="pb-3">
-                      <p className="text-sm text-muted-foreground">{opportunity.description}</p>
+                    <CardContent className="pb-2">
+                      <div className="text-sm text-muted-foreground line-clamp-3">
+                        {opportunity.description}
+                      </div>
+                      {opportunity.location && (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
+                          <Building className="h-3 w-3" />
+                          <span>{opportunity.location}</span>
+                        </div>
+                      )}
                       <div className="flex flex-wrap gap-1 mt-2">
-                        {opportunity.tags.map((tag, i) => (
-                          <Badge key={i} variant="outline" className="text-xs">{tag}</Badge>
+                        {opportunity.tags.slice(0, 3).map((tag, idx) => (
+                          <Badge key={idx} variant="outline" className="text-xs">
+                            {tag}
+                          </Badge>
                         ))}
                       </div>
                     </CardContent>
-                    <CardFooter className="pt-0 flex justify-between">
-                      <div className="flex items-center gap-1">
-                        <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
-                        <span className="text-sm font-medium">{opportunity.relevanceScore}% Relevant</span>
+                    <CardFooter className="flex justify-between pt-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-medium">
+                          {opportunity.relevanceScore}% Relevant
+                        </span>
+                        <Progress 
+                          value={opportunity.relevanceScore} 
+                          className="h-1.5 w-16" 
+                        />
                       </div>
-                      <Button variant="outline" size="sm" className="h-8" asChild>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="text-xs h-7 gap-1"
+                        asChild
+                      >
                         <a href={opportunity.url} target="_blank" rel="noopener noreferrer">
-                          Visit <ExternalLink className="h-3.5 w-3.5 ml-1" />
+                          <span>Visit</span>
+                          <ExternalLink className="h-3 w-3" />
                         </a>
                       </Button>
                     </CardFooter>
@@ -651,791 +692,591 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
                 ))}
               </div>
             )}
-            
-            <div className="pt-4">
-              <h3 className="text-base font-medium mb-1">Need more personalized suggestions?</h3>
-              <p className="text-sm text-muted-foreground mb-3">
-                Complete more sections of your profile or take our career assessment to get better networking recommendations.
-              </p>
-              <div className="flex gap-2">
-                <Button variant="outline" className="gap-1" onClick={() => handleBack()}>
-                  <FileText className="h-4 w-4" />
-                  <span>Update Profile</span>
-                </Button>
-              </div>
-            </div>
           </TabsContent>
           
           {/* Business Cards Tab */}
           <TabsContent value="cards" className="space-y-4">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">My Business Cards</h2>
-              <Button variant="outline" size="sm" onClick={() => setShowAddCardDialog(true)}>
-                <Plus className="h-4 w-4 mr-1" />
-                New Card
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1"
+                onClick={() => setShowAddCardDialog(true)}
+              >
+                <Plus className="h-4 w-4" />
+                <span>Create Card</span>
               </Button>
             </div>
             
             {filteredCards.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-6 text-center border border-dashed rounded-lg">
                 <Briefcase className="h-8 w-8 text-muted-foreground mb-2" />
-                <p className="text-muted-foreground mb-2">No business cards found</p>
-                <Button onClick={() => setShowAddCardDialog(true)}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  Create Business Card
-                </Button>
+                <p className="text-muted-foreground">No business cards found</p>
+                {searchQuery && (
+                  <Button 
+                    variant="link" 
+                    className="mt-1 h-auto p-0"
+                    onClick={() => setSearchQuery("")}
+                  >
+                    Clear search
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="grid gap-4 md:grid-cols-2">
                 {filteredCards.map((card) => (
-                  <Card key={card.id} className="overflow-hidden">
-                    <CardContent className="p-5">
-                      <div className="flex justify-between items-start">
-                        <div className="flex items-start space-x-3">
-                          <Avatar className="h-12 w-12">
-                            <AvatarImage src={card.avatarUrl} />
-                            <AvatarFallback>{card.name.charAt(0)}</AvatarFallback>
+                  <Card key={card.id}>
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between">
+                        <div className="flex items-center gap-3">
+                          <Avatar>
+                            {card.avatarUrl ? (
+                              <AvatarImage src={card.avatarUrl} />
+                            ) : null}
+                            <AvatarFallback>
+                              {card.name.split(' ').map(n => n[0]).join('')}
+                            </AvatarFallback>
                           </Avatar>
                           <div>
-                            <h3 className="font-medium">{card.name}</h3>
-                            <p className="text-sm text-muted-foreground">{card.title}</p>
-                            <p className="text-sm text-muted-foreground">{card.company}</p>
+                            <CardTitle className="text-base">{card.name}</CardTitle>
+                            <CardDescription className="text-xs">
+                              {card.title} at {card.company}
+                            </CardDescription>
                           </div>
                         </div>
-                        <div className="flex gap-1">
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            className="h-8 w-8 p-0"
+                        <div className="flex">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
                             onClick={() => setShowShareCardDialog(card.id)}
                           >
                             <Share2 className="h-4 w-4" />
                           </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            className="h-8 w-8 p-0 text-destructive"
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive"
                             onClick={() => handleDeleteCard(card.id)}
                           >
                             <Trash className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
-                      
-                      <div className="mt-3 space-y-2 text-sm">
-                        <div className="flex items-center gap-2">
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {card.tagline && (
+                        <p className="text-sm italic text-muted-foreground">"{card.tagline}"</p>
+                      )}
+                      <div className="grid gap-1.5">
+                        <div className="flex items-center gap-2 text-sm">
                           <Mail className="h-4 w-4 text-muted-foreground" />
                           <span>{card.email}</span>
                         </div>
                         {card.phone && (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 text-sm">
                             <Phone className="h-4 w-4 text-muted-foreground" />
                             <span>{card.phone}</span>
                           </div>
                         )}
                         {card.website && (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 text-sm">
                             <Globe className="h-4 w-4 text-muted-foreground" />
                             <span>{card.website}</span>
                           </div>
                         )}
                         {card.linkedin && (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 text-sm">
                             <Linkedin className="h-4 w-4 text-muted-foreground" />
                             <span>{card.linkedin}</span>
                           </div>
                         )}
                       </div>
-                      
-                      {card.tagline && (
-                        <div className="mt-3 pt-3 border-t">
-                          <p className="text-sm italic">"{card.tagline}"</p>
-                        </div>
-                      )}
                     </CardContent>
+                    <CardFooter className="pt-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full gap-1"
+                      >
+                        <DownloadCloud className="h-4 w-4" />
+                        <span>Download</span>
+                      </Button>
+                    </CardFooter>
                   </Card>
                 ))}
               </div>
+            )}
+            
+            {/* Create Business Card Dialog */}
+            <Dialog open={showAddCardDialog} onOpenChange={setShowAddCardDialog}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Create Business Card</DialogTitle>
+                  <DialogDescription>
+                    Enter your information to create a shareable business card.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="name">Name*</Label>
+                    <Input
+                      id="name"
+                      value={newCard.name}
+                      onChange={(e) => setNewCard({ ...newCard, name: e.target.value })}
+                      placeholder="Full Name"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="title">Job Title*</Label>
+                    <Input
+                      id="title"
+                      value={newCard.title}
+                      onChange={(e) => setNewCard({ ...newCard, title: e.target.value })}
+                      placeholder="Job Title"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="company">Company*</Label>
+                    <Input
+                      id="company"
+                      value={newCard.company}
+                      onChange={(e) => setNewCard({ ...newCard, company: e.target.value })}
+                      placeholder="Company Name"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="email">Email*</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={newCard.email}
+                      onChange={(e) => setNewCard({ ...newCard, email: e.target.value })}
+                      placeholder="Email Address"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="phone">Phone</Label>
+                    <Input
+                      id="phone"
+                      value={newCard.phone}
+                      onChange={(e) => setNewCard({ ...newCard, phone: e.target.value })}
+                      placeholder="Phone Number"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="website">Website</Label>
+                    <Input
+                      id="website"
+                      value={newCard.website}
+                      onChange={(e) => setNewCard({ ...newCard, website: e.target.value })}
+                      placeholder="Personal/Company Website"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="linkedin">LinkedIn</Label>
+                    <Input
+                      id="linkedin"
+                      value={newCard.linkedin}
+                      onChange={(e) => setNewCard({ ...newCard, linkedin: e.target.value })}
+                      placeholder="LinkedIn Profile"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="tagline">Tagline/Slogan</Label>
+                    <Input
+                      id="tagline"
+                      value={newCard.tagline}
+                      onChange={(e) => setNewCard({ ...newCard, tagline: e.target.value })}
+                      placeholder="Your professional tagline or personal slogan"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setShowAddCardDialog(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAddCard}>
+                    Create Card
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            
+            {/* Share Business Card Dialog */}
+            {showShareCardDialog && (
+              <Dialog open={!!showShareCardDialog} onOpenChange={() => setShowShareCardDialog(null)}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Share Business Card</DialogTitle>
+                    <DialogDescription>
+                      Choose how you'd like to share your business card.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-medium">Share via</h3>
+                      <div className="flex gap-2">
+                        <Button variant="outline" className="flex-1 gap-1">
+                          <Mail className="h-4 w-4" />
+                          <span>Email</span>
+                        </Button>
+                        <Button variant="outline" className="flex-1 gap-1">
+                          <Share2 className="h-4 w-4" />
+                          <span>Link</span>
+                        </Button>
+                        <Button variant="outline" className="flex-1 gap-1">
+                          <DownloadCloud className="h-4 w-4" />
+                          <span>Save</span>
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-medium">QR Code</h3>
+                      <div className="border rounded-md p-4 flex justify-center">
+                        <div className="w-40 h-40 bg-gray-200 flex items-center justify-center text-center text-xs text-gray-500">
+                          QR Code for your business card would appear here
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setShowShareCardDialog(null)}>
+                      Close
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             )}
           </TabsContent>
           
           {/* Resume Builder Tab */}
           <TabsContent value="resume" className="space-y-4">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Resume Builder</h2>
-              <Dialog open={showAddResumeDialog} onOpenChange={setShowAddResumeDialog}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Section
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Add Resume Section</DialogTitle>
-                    <DialogDescription>
-                      Create a new section for your resume. This will be used to generate your professional resume.
-                    </DialogDescription>
-                  </DialogHeader>
-                  
-                  <div className="space-y-4 py-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="sectionType">Section Type</Label>
-                      <Select
-                        value={resumeSectionType}
-                        onValueChange={(value) => {
-                          setResumeSectionType(value)
-                          setNewResumeSection(prev => ({ ...prev, type: value as "experience" | "education" | "skills" | "projects" | "certifications" }))
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="experience">Work Experience</SelectItem>
-                          <SelectItem value="education">Education</SelectItem>
-                          <SelectItem value="skills">Skills</SelectItem>
-                          <SelectItem value="projects">Projects</SelectItem>
-                          <SelectItem value="certifications">Certifications</SelectItem>
-                        </SelectContent>
-                      </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1"
+                onClick={() => {
+                  setResumeSectionType("experience")
+                  setShowAddResumeDialog(true)
+                }}
+              >
+                <Plus className="h-4 w-4" />
+                <span>Add Section</span>
+              </Button>
+            </div>
+            
+            <div className="space-y-6">
+              {Object.keys(filteredResumeSections).length === 0 ? (
+                <div className="flex flex-col items-center justify-center p-6 text-center border border-dashed rounded-lg">
+                  <FileText className="h-8 w-8 text-muted-foreground mb-2" />
+                  <p className="text-muted-foreground">No resume sections found</p>
+                  {searchQuery && (
+                    <Button 
+                      variant="link" 
+                      className="mt-1 h-auto p-0"
+                      onClick={() => setSearchQuery("")}
+                    >
+                      Clear search
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                Object.entries(filteredResumeSections).map(([type, sections]) => (
+                  <div key={type} className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      {getResumeSectionIcon(type)}
+                      <h3 className="text-base font-medium capitalize">{type}</h3>
                     </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="title">Title*</Label>
+                    <div className="grid gap-3">
+                      {sections.map((section) => (
+                        <Card key={section.id}>
+                          <CardHeader className="p-4 pb-2">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <CardTitle className="text-base">{section.title}</CardTitle>
+                                {section.organization && (
+                                  <CardDescription className="text-xs mt-0.5">
+                                    {section.organization} {section.date ? `• ${section.date}` : ''}
+                                  </CardDescription>
+                                )}
+                              </div>
+                              <div className="flex">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => setSelectedResumeSection(section)}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive"
+                                  onClick={() => handleDeleteResumeSection(section.id)}
+                                >
+                                  <Trash className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="p-4 pt-2 text-sm">
+                            <p className="text-muted-foreground mb-2">
+                              {section.description}
+                            </p>
+                            {section.bullets && section.bullets.length > 0 && (
+                              <ul className="space-y-1 pl-5 list-disc">
+                                {section.bullets.map((bullet, idx) => (
+                                  <li key={idx}>{bullet}</li>
+                                ))}
+                              </ul>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            
+            <div className="mt-6 flex justify-center">
+              <Button className="gap-1">
+                <DownloadCloud className="h-4 w-4" />
+                <span>Download Complete Resume</span>
+              </Button>
+            </div>
+            
+            {/* Add Resume Section Dialog */}
+            <Dialog open={showAddResumeDialog} onOpenChange={setShowAddResumeDialog}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Add Resume Section</DialogTitle>
+                  <DialogDescription>
+                    Add a new section to your resume.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="section-type">Section Type</Label>
+                    <Select 
+                      value={resumeSectionType} 
+                      onValueChange={(value) => {
+                        setResumeSectionType(value)
+                        setNewResumeSection({
+                          ...newResumeSection,
+                          type: value as any
+                        })
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a section type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="experience">Experience</SelectItem>
+                        <SelectItem value="education">Education</SelectItem>
+                        <SelectItem value="skills">Skills</SelectItem>
+                        <SelectItem value="projects">Projects</SelectItem>
+                        <SelectItem value="certifications">Certifications</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="title">Title*</Label>
+                    <Input
+                      id="title"
+                      value={newResumeSection.title}
+                      onChange={(e) => setNewResumeSection({ ...newResumeSection, title: e.target.value })}
+                      placeholder={resumeSectionType === "experience" ? "Job Title" : 
+                        resumeSectionType === "education" ? "Degree" : 
+                        resumeSectionType === "skills" ? "Skill Category" :
+                        resumeSectionType === "projects" ? "Project Name" : "Certification Name"}
+                    />
+                  </div>
+                  {resumeSectionType !== "skills" && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="organization">
+                        {resumeSectionType === "experience" ? "Company" :
+                          resumeSectionType === "education" ? "Institution" :
+                          resumeSectionType === "projects" ? "Organization" : "Issuing Organization"}*
+                      </Label>
                       <Input
-                        id="title"
-                        value={newResumeSection.title}
-                        onChange={(e) => setNewResumeSection(prev => ({ ...prev, title: e.target.value }))}
-                        placeholder={
-                          resumeSectionType === "experience" ? "Job Title" :
-                          resumeSectionType === "education" ? "Degree" :
-                          resumeSectionType === "skills" ? "Skill Category" :
-                          resumeSectionType === "projects" ? "Project Name" :
-                          "Certification Name"
-                        }
+                        id="organization"
+                        value={newResumeSection.organization}
+                        onChange={(e) => setNewResumeSection({ ...newResumeSection, organization: e.target.value })}
                       />
                     </div>
-                    
-                    {resumeSectionType !== "skills" && (
-                      <div className="space-y-2">
-                        <Label htmlFor="organization">
-                          {resumeSectionType === "experience" ? "Company*" :
-                           resumeSectionType === "education" ? "Institution*" :
-                           resumeSectionType === "projects" ? "Organization" :
-                           "Issuing Organization*"}
+                  )}
+                  <div className="grid gap-2">
+                    <Label htmlFor="date">
+                      {resumeSectionType === "experience" || resumeSectionType === "education" ? 
+                        "Date Range" : "Date"}
+                    </Label>
+                    <Input
+                      id="date"
+                      value={newResumeSection.date}
+                      onChange={(e) => setNewResumeSection({ ...newResumeSection, date: e.target.value })}
+                      placeholder={resumeSectionType === "experience" || resumeSectionType === "education" ? 
+                        "2020 - Present" : "May 2023"}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      value={newResumeSection.description}
+                      onChange={(e) => setNewResumeSection({ ...newResumeSection, description: e.target.value })}
+                      placeholder="Brief description"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Bullet Points</Label>
+                    <div className="space-y-2">
+                      {newResumeSection.bullets?.map((bullet, idx) => (
+                        <Input
+                          key={idx}
+                          value={bullet}
+                          onChange={(e) => {
+                            const newBullets = [...(newResumeSection.bullets || [])];
+                            newBullets[idx] = e.target.value;
+                            setNewResumeSection({ ...newResumeSection, bullets: newBullets });
+                          }}
+                          placeholder={`Bullet point ${idx + 1}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setShowAddResumeDialog(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAddResumeSection}>
+                    Add Section
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            
+            {/* Edit Resume Section Dialog */}
+            <Dialog 
+              open={!!selectedResumeSection} 
+              onOpenChange={(open) => !open && setSelectedResumeSection(null)}
+            >
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Edit Resume Section</DialogTitle>
+                  <DialogDescription>
+                    Update this resume section.
+                  </DialogDescription>
+                </DialogHeader>
+                {selectedResumeSection && (
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-title">Title*</Label>
+                      <Input
+                        id="edit-title"
+                        value={selectedResumeSection.title}
+                        onChange={(e) => setSelectedResumeSection({ ...selectedResumeSection, title: e.target.value })}
+                      />
+                    </div>
+                    {selectedResumeSection.type !== "skills" && (
+                      <div className="grid gap-2">
+                        <Label htmlFor="edit-organization">
+                          {selectedResumeSection.type === "experience" ? "Company" :
+                            selectedResumeSection.type === "education" ? "Institution" :
+                            selectedResumeSection.type === "projects" ? "Organization" : "Issuing Organization"}*
                         </Label>
                         <Input
-                          id="organization"
-                          value={newResumeSection.organization || ""}
-                          onChange={(e) => setNewResumeSection(prev => ({ ...prev, organization: e.target.value }))}
+                          id="edit-organization"
+                          value={selectedResumeSection.organization}
+                          onChange={(e) => setSelectedResumeSection({ ...selectedResumeSection, organization: e.target.value })}
                         />
                       </div>
                     )}
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="date">
-                        {resumeSectionType === "experience" || resumeSectionType === "education" ? "Date Range" :
-                         resumeSectionType === "projects" ? "Completion Date" :
-                         "Issue Date"}
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-date">
+                        {selectedResumeSection.type === "experience" || selectedResumeSection.type === "education" ? 
+                          "Date Range" : "Date"}
                       </Label>
                       <Input
-                        id="date"
-                        value={newResumeSection.date || ""}
-                        onChange={(e) => setNewResumeSection(prev => ({ ...prev, date: e.target.value }))}
-                        placeholder={resumeSectionType === "experience" ? "e.g., 2020 - Present" : "e.g., May 2023"}
+                        id="edit-date"
+                        value={selectedResumeSection.date}
+                        onChange={(e) => setSelectedResumeSection({ ...selectedResumeSection, date: e.target.value })}
                       />
                     </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="description">Description</Label>
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-description">Description</Label>
                       <Textarea
-                        id="description"
-                        value={newResumeSection.description}
-                        onChange={(e) => setNewResumeSection(prev => ({ ...prev, description: e.target.value }))}
-                        placeholder="Brief description"
-                        rows={2}
+                        id="edit-description"
+                        value={selectedResumeSection.description}
+                        onChange={(e) => setSelectedResumeSection({ ...selectedResumeSection, description: e.target.value })}
                       />
                     </div>
-                    
-                    <div className="space-y-2">
-                      <Label>Key Points (Bullet Points)</Label>
-                      {newResumeSection.bullets?.map((bullet, index) => (
-                        <Input
-                          key={index}
-                          value={bullet}
-                          onChange={(e) => {
-                            const newBullets = [...(newResumeSection.bullets || [])]
-                            newBullets[index] = e.target.value
-                            setNewResumeSection(prev => ({ ...prev, bullets: newBullets }))
+                    <div className="grid gap-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Bullet Points</Label>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2"
+                          onClick={() => {
+                            setSelectedResumeSection({ 
+                              ...selectedResumeSection, 
+                              bullets: [...(selectedResumeSection.bullets || []), ""] 
+                            });
                           }}
-                          placeholder={`Bullet point ${index + 1}`}
-                          className="mb-2"
-                        />
-                      ))}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setNewResumeSection(prev => ({ 
-                          ...prev, 
-                          bullets: [...(prev.bullets || []), ""] 
-                        }))}
-                      >
-                        <Plus className="h-3.5 w-3.5 mr-1" />
-                        Add Bullet
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setShowAddResumeDialog(false)}>
-                      Cancel
-                    </Button>
-                    <Button onClick={handleAddResumeSection}>
-                      Add to Resume
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
-            
-            {Object.keys(filteredResumeSections).length === 0 ? (
-              <div className="flex flex-col items-center justify-center p-6 text-center border border-dashed rounded-lg">
-                <FileText className="h-8 w-8 text-muted-foreground mb-2" />
-                <p className="text-muted-foreground mb-2">No resume sections found</p>
-                <Button onClick={() => setShowAddResumeDialog(true)}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add First Section
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {/* Experience Section */}
-                {filteredResumeSections.experience && (
-                  <div className="space-y-3">
-                    <div className="flex items-center">
-                      <Briefcase className="h-5 w-5 mr-2 text-primary" />
-                      <h3 className="text-base font-semibold">Experience</h3>
-                    </div>
-                    <div className="space-y-3">
-                      {filteredResumeSections.experience.map((section) => (
-                        <Card key={section.id} className="overflow-hidden">
-                          <CardHeader className="pb-2">
-                            <div className="flex justify-between">
-                              <div>
-                                <CardTitle className="text-base">{section.title}</CardTitle>
-                                <CardDescription>
-                                  {section.organization} {section.date && `• ${section.date}`}
-                                </CardDescription>
-                              </div>
-                              <div className="flex gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0"
-                                  onClick={() => {
-                                    setSelectedResumeSection(section)
-                                    setResumeSectionType(section.type)
-                                  }}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0 text-destructive"
-                                  onClick={() => handleDeleteResumeSection(section.id)}
-                                >
-                                  <Trash className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          </CardHeader>
-                          <CardContent className="pb-3">
-                            {section.description && (
-                              <p className="text-sm text-muted-foreground mb-2">{section.description}</p>
-                            )}
-                            {section.bullets && section.bullets.length > 0 && (
-                              <ul className="text-sm space-y-1 list-disc pl-5">
-                                {section.bullets.map((bullet, i) => (
-                                  <li key={i}>{bullet}</li>
-                                ))}
-                              </ul>
-                            )}
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Education Section */}
-                {filteredResumeSections.education && (
-                  <div className="space-y-3">
-                    <div className="flex items-center">
-                      <Globe className="h-5 w-5 mr-2 text-primary" />
-                      <h3 className="text-base font-semibold">Education</h3>
-                    </div>
-                    <div className="space-y-3">
-                      {filteredResumeSections.education.map((section) => (
-                        <Card key={section.id} className="overflow-hidden">
-                          <CardHeader className="pb-2">
-                            <div className="flex justify-between">
-                              <div>
-                                <CardTitle className="text-base">{section.title}</CardTitle>
-                                <CardDescription>
-                                  {section.organization} {section.date && `• ${section.date}`}
-                                </CardDescription>
-                              </div>
-                              <div className="flex gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0"
-                                  onClick={() => {
-                                    setSelectedResumeSection(section)
-                                    setResumeSectionType(section.type)
-                                  }}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0 text-destructive"
-                                  onClick={() => handleDeleteResumeSection(section.id)}
-                                >
-                                  <Trash className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          </CardHeader>
-                          <CardContent className="pb-3">
-                            {section.description && (
-                              <p className="text-sm text-muted-foreground mb-2">{section.description}</p>
-                            )}
-                            {section.bullets && section.bullets.length > 0 && (
-                              <ul className="text-sm space-y-1 list-disc pl-5">
-                                {section.bullets.map((bullet, i) => (
-                                  <li key={i}>{bullet}</li>
-                                ))}
-                              </ul>
-                            )}
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Skills Section */}
-                {filteredResumeSections.skills && (
-                  <div className="space-y-3">
-                    <div className="flex items-center">
-                      <CheckCircle2 className="h-5 w-5 mr-2 text-primary" />
-                      <h3 className="text-base font-semibold">Skills</h3>
-                    </div>
-                    <div className="space-y-3">
-                      {filteredResumeSections.skills.map((section) => (
-                        <Card key={section.id} className="overflow-hidden">
-                          <CardHeader className="pb-2">
-                            <div className="flex justify-between">
-                              <div>
-                                <CardTitle className="text-base">{section.title}</CardTitle>
-                                {section.description && (
-                                  <CardDescription>{section.description}</CardDescription>
-                                )}
-                              </div>
-                              <div className="flex gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0"
-                                  onClick={() => {
-                                    setSelectedResumeSection(section)
-                                    setResumeSectionType(section.type)
-                                  }}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0 text-destructive"
-                                  onClick={() => handleDeleteResumeSection(section.id)}
-                                >
-                                  <Trash className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          </CardHeader>
-                          <CardContent className="pb-3">
-                            {section.bullets && section.bullets.length > 0 && (
-                              <div className="flex flex-wrap gap-2">
-                                {section.bullets.map((bullet, i) => (
-                                  <Badge key={i} variant="secondary">
-                                    {bullet}
-                                  </Badge>
-                                ))}
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Other Sections (Projects, Certifications) */}
-                {Object.entries(filteredResumeSections)
-                  .filter(([type]) => !['experience', 'education', 'skills'].includes(type))
-                  .map(([type, sections]) => (
-                    <div key={type} className="space-y-3">
-                      <div className="flex items-center">
-                        {type === 'projects' ? 
-                          <FileText className="h-5 w-5 mr-2 text-primary" /> : 
-                          <Download className="h-5 w-5 mr-2 text-primary" />}
-                        <h3 className="text-base font-semibold">
-                          {type.charAt(0).toUpperCase() + type.slice(1)}
-                        </h3>
+                        >
+                          <Plus className="h-3.5 w-3.5 mr-1" />
+                          <span className="text-xs">Add</span>
+                        </Button>
                       </div>
-                      <div className="space-y-3">
-                        {sections.map((section) => (
-                          <Card key={section.id} className="overflow-hidden">
-                            <CardHeader className="pb-2">
-                              <div className="flex justify-between">
-                                <div>
-                                  <CardTitle className="text-base">{section.title}</CardTitle>
-                                  <CardDescription>
-                                    {section.organization && `${section.organization} `}
-                                    {section.date && `• ${section.date}`}
-                                  </CardDescription>
-                                </div>
-                                <div className="flex gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-8 w-8 p-0"
-                                    onClick={() => {
-                                      setSelectedResumeSection(section)
-                                      setResumeSectionType(section.type)
-                                    }}
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-8 w-8 p-0 text-destructive"
-                                    onClick={() => handleDeleteResumeSection(section.id)}
-                                  >
-                                    <Trash className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </div>
-                            </CardHeader>
-                            <CardContent className="pb-3">
-                              {section.description && (
-                                <p className="text-sm text-muted-foreground mb-2">{section.description}</p>
-                              )}
-                              {section.bullets && section.bullets.length > 0 && (
-                                <ul className="text-sm space-y-1 list-disc pl-5">
-                                  {section.bullets.map((bullet, i) => (
-                                    <li key={i}>{bullet}</li>
-                                  ))}
-                                </ul>
-                              )}
-                            </CardContent>
-                          </Card>
+                      <div className="space-y-2">
+                        {selectedResumeSection.bullets?.map((bullet, idx) => (
+                          <div key={idx} className="flex gap-2">
+                            <Input
+                              value={bullet}
+                              onChange={(e) => {
+                                const newBullets = [...(selectedResumeSection.bullets || [])];
+                                newBullets[idx] = e.target.value;
+                                setSelectedResumeSection({ ...selectedResumeSection, bullets: newBullets });
+                              }}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-9 w-9 text-destructive shrink-0"
+                              onClick={() => {
+                                const newBullets = [...(selectedResumeSection.bullets || [])];
+                                newBullets.splice(idx, 1);
+                                setSelectedResumeSection({ ...selectedResumeSection, bullets: newBullets });
+                              }}
+                            >
+                              <Trash className="h-4 w-4" />
+                            </Button>
+                          </div>
                         ))}
                       </div>
                     </div>
-                  ))}
-                
-                {/* Export Actions */}
-                <div className="flex justify-center mt-4 pt-4 border-t">
-                  <Button className="gap-1">
-                    <DownloadCloud className="h-4 w-4" />
-                    <span>Download Resume</span>
+                  </div>
+                )}
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setSelectedResumeSection(null)}>
+                    Cancel
                   </Button>
-                </div>
-              </div>
-            )}
+                  <Button onClick={handleEditResumeSection}>
+                    Save Changes
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
         </Tabs>
       </div>
-      
-      {/* Add Business Card Dialog */}
-      <Dialog open={showAddCardDialog} onOpenChange={setShowAddCardDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create Business Card</DialogTitle>
-            <DialogDescription>
-              Create a professional business card to share with your network.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="name">Full Name*</Label>
-              <Input
-                id="name"
-                value={newCard.name}
-                onChange={(e) => setNewCard(prev => ({ ...prev, name: e.target.value }))}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="title">Job Title*</Label>
-              <Input
-                id="title"
-                value={newCard.title}
-                onChange={(e) => setNewCard(prev => ({ ...prev, title: e.target.value }))}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="company">Company/Organization*</Label>
-              <Input
-                id="company"
-                value={newCard.company}
-                onChange={(e) => setNewCard(prev => ({ ...prev, company: e.target.value }))}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="email">Email Address*</Label>
-              <Input
-                id="email"
-                value={newCard.email}
-                onChange={(e) => setNewCard(prev => ({ ...prev, email: e.target.value }))}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number</Label>
-              <Input
-                id="phone"
-                value={newCard.phone || ""}
-                onChange={(e) => setNewCard(prev => ({ ...prev, phone: e.target.value }))}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="website">Website</Label>
-              <Input
-                id="website"
-                value={newCard.website || ""}
-                onChange={(e) => setNewCard(prev => ({ ...prev, website: e.target.value }))}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="linkedin">LinkedIn</Label>
-              <Input
-                id="linkedin"
-                value={newCard.linkedin || ""}
-                onChange={(e) => setNewCard(prev => ({ ...prev, linkedin: e.target.value }))}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="tagline">Tagline/Bio</Label>
-              <Textarea
-                id="tagline"
-                value={newCard.tagline || ""}
-                onChange={(e) => setNewCard(prev => ({ ...prev, tagline: e.target.value }))}
-                placeholder="A brief professional statement"
-                rows={2}
-              />
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddCardDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddCard}>
-              Create Card
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      {/* Edit Resume Section Dialog */}
-      {selectedResumeSection && (
-        <Dialog
-          open={!!selectedResumeSection}
-          onOpenChange={(open) => !open && setSelectedResumeSection(null)}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Edit Resume Section</DialogTitle>
-              <DialogDescription>
-                Update this section of your resume.
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="space-y-4 py-2">
-              <div className="space-y-2">
-                <Label htmlFor="edit-title">Title*</Label>
-                <Input
-                  id="edit-title"
-                  value={selectedResumeSection.title}
-                  onChange={(e) => setSelectedResumeSection({ ...selectedResumeSection, title: e.target.value })}
-                />
-              </div>
-              
-              {selectedResumeSection.type !== "skills" && (
-                <div className="space-y-2">
-                  <Label htmlFor="edit-organization">
-                    {selectedResumeSection.type === "experience" ? "Company*" :
-                     selectedResumeSection.type === "education" ? "Institution*" :
-                     selectedResumeSection.type === "projects" ? "Organization" :
-                     "Issuing Organization*"}
-                  </Label>
-                  <Input
-                    id="edit-organization"
-                    value={selectedResumeSection.organization || ""}
-                    onChange={(e) => setSelectedResumeSection({ ...selectedResumeSection, organization: e.target.value })}
-                  />
-                </div>
-              )}
-              
-              <div className="space-y-2">
-                <Label htmlFor="edit-date">
-                  {selectedResumeSection.type === "experience" || selectedResumeSection.type === "education" ? "Date Range" :
-                   selectedResumeSection.type === "projects" ? "Completion Date" :
-                   "Issue Date"}
-                </Label>
-                <Input
-                  id="edit-date"
-                  value={selectedResumeSection.date || ""}
-                  onChange={(e) => setSelectedResumeSection({ ...selectedResumeSection, date: e.target.value })}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="edit-description">Description</Label>
-                <Textarea
-                  id="edit-description"
-                  value={selectedResumeSection.description}
-                  onChange={(e) => setSelectedResumeSection({ ...selectedResumeSection, description: e.target.value })}
-                  rows={2}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label>Key Points (Bullet Points)</Label>
-                {selectedResumeSection.bullets?.map((bullet, index) => (
-                  <Input
-                    key={index}
-                    value={bullet}
-                    onChange={(e) => {
-                      const newBullets = [...(selectedResumeSection.bullets || [])];
-                      newBullets[index] = e.target.value;
-                      setSelectedResumeSection({ ...selectedResumeSection, bullets: newBullets });
-                    }}
-                    className="mb-2"
-                  />
-                ))}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSelectedResumeSection({ 
-                    ...selectedResumeSection, 
-                    bullets: [...(selectedResumeSection.bullets || []), ""] 
-                  })}
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1" />
-                  Add Bullet
-                </Button>
-              </div>
-            </div>
-            
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setSelectedResumeSection(null)}>
-                Cancel
-              </Button>
-              <Button onClick={handleEditResumeSection}>
-                Save Changes
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-      
-      {/* Share Business Card Dialog */}
-      <Dialog
-        open={!!showShareCardDialog}
-        onOpenChange={(open) => !open && setShowShareCardDialog(null)}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Share Business Card</DialogTitle>
-            <DialogDescription>
-              Share your business card with your network.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="flex flex-col items-center justify-center p-4">
-            {showShareCardDialog && (
-              <div className="w-full max-w-sm p-4 border rounded-lg bg-card">
-                <div className="flex flex-col items-center text-center">
-                  <Avatar className="h-16 w-16 mb-2">
-                    <AvatarFallback>{myCards.find(c => c.id === showShareCardDialog)?.name.charAt(0) || "U"}</AvatarFallback>
-                  </Avatar>
-                  <h3 className="font-bold text-lg">
-                    {myCards.find(c => c.id === showShareCardDialog)?.name}
-                  </h3>
-                  <p className="text-muted-foreground">
-                    {myCards.find(c => c.id === showShareCardDialog)?.title}
-                  </p>
-                  <p className="text-muted-foreground">
-                    {myCards.find(c => c.id === showShareCardDialog)?.company}
-                  </p>
-                  
-                  <Separator className="my-3" />
-                  
-                  <div className="w-full text-sm space-y-2">
-                    <div className="flex items-center justify-center gap-2">
-                      <Mail className="h-4 w-4" />
-                      <span>{myCards.find(c => c.id === showShareCardDialog)?.email}</span>
-                    </div>
-                    
-                    {myCards.find(c => c.id === showShareCardDialog)?.phone && (
-                      <div className="flex items-center justify-center gap-2">
-                        <Phone className="h-4 w-4" />
-                        <span>{myCards.find(c => c.id === showShareCardDialog)?.phone}</span>
-                      </div>
-                    )}
-                    
-                    {myCards.find(c => c.id === showShareCardDialog)?.website && (
-                      <div className="flex items-center justify-center gap-2">
-                        <Globe className="h-4 w-4" />
-                        <span>{myCards.find(c => c.id === showShareCardDialog)?.website}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            <div className="flex w-full justify-center gap-2 mt-4">
-              <Button variant="outline">
-                <Download className="h-4 w-4 mr-2" />
-                Download
-              </Button>
-              <Button>
-                <Share2 className="h-4 w-4 mr-2" />
-                Share
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
