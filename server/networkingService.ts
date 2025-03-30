@@ -3,11 +3,14 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// API keys from environment variables (also hardcoded as fallback as requested by user)
+// API keys from environment variables
 const EVENTBRITE_TOKEN = process.env.EVENTBRITE_TOKEN || 'DSBQW62GEUQM7ONFQ5K5';
 const EVENTBRITE_APP_KEY = process.env.EVENTBRITE_APP_KEY || 'GLDXQTI423FDOGWKIX'; 
 const EVENTBRITE_USER_ID = process.env.EVENTBRITE_USER_ID || '2703283588001';
-const TICKETMASTER_KEY = process.env.TICKETMASTER_KEY || 'buoqK3RrRD1tk73Uquh3JRtSLFeOG9Zp';
+
+// Ticketmaster credentials from environment variables
+const TICKETMASTER_KEY = process.env.TICKETMASTER_KEY; // Using real API key from environment
+const TICKETMASTER_SECRET = process.env.TICKETMASTER_SECRET; // Using real API secret from environment
 
 // Interfaces for event data
 interface EventbriteEvent {
@@ -305,7 +308,7 @@ export async function searchTicketmasterEvents(
     
     // Create a more targeted search query
     // Use size parameter to get more results
-    let url = `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${TICKETMASTER_KEY}&size=50&sort=date,asc`;
+    let url = `https://app.ticketmaster.com/discovery/v2/events.json?size=50&sort=date,asc`;
     
     // Add classificationName to focus on business/conference events
     url += '&classificationName=conference,meeting,business,networking,workshop';
@@ -323,10 +326,26 @@ export async function searchTicketmasterEvents(
       url += `&city=${encodeURIComponent(location)}`;
     }
     
-    console.log(`[Ticketmaster] Attempting to fetch events with URL: ${url.replace(TICKETMASTER_KEY, '***')}`);
+    // Create authorization headers with API key and secret
+    const headers: Record<string, string> = {};
+    if (TICKETMASTER_KEY) {
+      // Add API key as a query parameter
+      url += `&apikey=${TICKETMASTER_KEY}`;
+    }
+    
+    // Add authentication headers if secret is available
+    if (TICKETMASTER_SECRET) {
+      // Some APIs require an additional Authorization header
+      headers['Authorization'] = `Bearer ${TICKETMASTER_SECRET}`;
+    }
+    
+    // Log URL without exposing the API key
+    const sanitizedUrl = TICKETMASTER_KEY ? url.replace(TICKETMASTER_KEY, '***') : url;
+    console.log(`[Ticketmaster] Attempting to fetch events with URL: ${sanitizedUrl}`);
     
     // Make API request to Ticketmaster
     const response = await axios.get(url, {
+      headers,
       validateStatus: (status) => status < 500, // Accept any status code less than 500 to handle errors gracefully
     });
     
@@ -337,9 +356,19 @@ export async function searchTicketmasterEvents(
       // Try a simpler backup search if the first one fails
       try {
         console.log('[Ticketmaster] Trying simpler backup search');
-        const backupUrl = `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${TICKETMASTER_KEY}&size=30&classificationName=business`;
+        let backupUrl = `https://app.ticketmaster.com/discovery/v2/events.json?size=30&classificationName=business`;
+        
+        // Add API key as a query parameter
+        if (TICKETMASTER_KEY) {
+          backupUrl += `&apikey=${TICKETMASTER_KEY}`;
+        }
+        
+        // Sanitize URL for logging
+        const sanitizedBackupUrl = TICKETMASTER_KEY ? backupUrl.replace(TICKETMASTER_KEY, '***') : backupUrl;
+        console.log(`[Ticketmaster] Backup search URL: ${sanitizedBackupUrl}`);
         
         const backupResponse = await axios.get(backupUrl, {
+          headers, // Use the same headers with auth
           validateStatus: (status) => status < 500
         });
         
