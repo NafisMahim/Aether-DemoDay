@@ -294,13 +294,34 @@ export async function searchTicketmasterEvents(
       return [];
     }
     
-    // IMPORTANT: We'll use only one reliable approach for getting events
-    // Previous approach had issues with authorization
+    // Filter out some keywords that are too long or contain special syntax
+    const filteredKeywords = interestKeywords.filter(keyword => 
+      keyword.length < 50 && 
+      !keyword.includes("'re") && 
+      !keyword.includes(".")
+    );
+    
+    // Focus on professional/career keywords from the list
+    const professionalKeywords = [
+      "business", "conference", "workshop", "networking", 
+      "professional", "career", "development", "training", 
+      "leadership", "management", "human resources", "hr", 
+      "community", "healthcare"
+    ];
+    
+    // Combine with user interests but limit to prevent overly complex queries
+    const relevantKeywords = [
+      ...professionalKeywords,
+      ...filteredKeywords.slice(0, 3) // Take just a few user keywords
+    ];
+    
+    // Join keywords for the API query, picking the most relevant ones
+    const keywordString = relevantKeywords.slice(0, 5).join(",");
     
     try {
-      // Simple direct API call that matches how curl works
-      console.log('[Ticketmaster] Making direct API call');
-      const directUrl = `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${TICKETMASTER_KEY}&size=20`;
+      // Build URL with specific focus on career/networking keywords
+      console.log('[Ticketmaster] Making targeted API call for professional events');
+      const directUrl = `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${TICKETMASTER_KEY}&size=50&keyword=${encodeURIComponent(keywordString)}&sort=date,asc`;
       
       // Log sanitized URL
       const sanitizedUrl = directUrl.replace(TICKETMASTER_KEY, '***');
@@ -311,11 +332,42 @@ export async function searchTicketmasterEvents(
       
       // Process the response
       if (response.data && response.data._embedded && response.data._embedded.events) {
-        const events = response.data._embedded.events;
-        console.log(`[Ticketmaster] Successfully fetched ${events.length} events directly`);
+        const allEvents = response.data._embedded.events;
+        console.log(`[Ticketmaster] Successfully fetched ${allEvents.length} events directly`);
         
-        // Process and return the events
-        return processTicketmasterEvents(events);
+        // Pre-filter events to exclude obviously irrelevant ones
+        const filteredEvents = allEvents.filter((event: TicketmasterEvent) => {
+          // Skip sports events
+          if (event.classifications?.[0]?.segment?.name === 'Sports') {
+            return false;
+          }
+          
+          // Skip concerts and music events
+          if (event.classifications?.[0]?.segment?.name === 'Music') {
+            return false;
+          }
+          
+          // Skip entertainment events that aren't professional
+          const name = event.name?.toLowerCase() || '';
+          if (
+            (name.includes('game') || 
+             name.includes('concert') || 
+             name.includes('festival') || 
+             name.includes('championship')) && 
+            !name.includes('business') && 
+            !name.includes('career') && 
+            !name.includes('professional')
+          ) {
+            return false;
+          }
+          
+          return true;
+        });
+        
+        console.log(`[Ticketmaster] Filtered down to ${filteredEvents.length} relevant professional events`);
+        
+        // Process and return the filtered events
+        return processTicketmasterEvents(filteredEvents);
       } else {
         console.log('[Ticketmaster] No events found in direct API response');
       }
@@ -441,14 +493,25 @@ function calculateRelevanceScores(
   userInterests: string[],
   personalityType: string
 ): NetworkingEvent[] {
+  // Define career-related keywords for stronger filtering
+  const careerKeywords = [
+    'business', 'conference', 'leadership', 'professional', 'career', 
+    'development', 'training', 'workshop', 'networking', 'education',
+    'management', 'human resources', 'hr', 'community', 'healthcare',
+    'innovation', 'entrepreneurship', 'technology', 'communication'
+  ];
+  
   // Lowercase all interests for case-insensitive matching
-  const interests = userInterests.map(interest => interest.toLowerCase());
+  const interests = userInterests
+    .map(interest => interest.toLowerCase())
+    .filter(interest => interest.length < 50); // Filter out very long interests
+  
   const personality = personalityType.toLowerCase();
   
   // Personality preferences mapping for event types
   const personalityPreferences: Record<string, string[]> = {
     'analytical': ['conference', 'workshop', 'meetup'],
-    'creative': ['workshop', 'concert', 'other'],
+    'creative': ['workshop', 'meetup', 'networking'],
     'social': ['networking', 'meetup', 'conference'],
     'practical': ['workshop', 'conference', 'networking']
   };
@@ -464,28 +527,76 @@ function calculateRelevanceScores(
     }
   }
   
-  return events.map(event => {
-    let score = 50; // Base score
+  const scoredEvents = events.map(event => {
+    let score = 40; // Start with a lower base score
+    let careerRelevance = false;
     
-    // Check title for interest matches (highest weight)
+    // Check for career relevance in title and description
+    const title = event.title.toLowerCase();
+    const description = event.description.toLowerCase();
+    
+    // Strongly penalize sports, concerts and entertainment events
+    if (
+      (title.includes('sports') || 
+       title.includes('game') || 
+       title.includes('concert') || 
+       title.includes('music') || 
+       title.includes('festival') || 
+       title.includes('championship')) &&
+      !(title.includes('business') || 
+        title.includes('career') || 
+        title.includes('professional') ||
+        title.includes('conference'))
+    ) {
+      score -= 30;
+    }
+    
+    // Check title for career keyword matches (highest weight)
+    for (const keyword of careerKeywords) {
+      if (title.includes(keyword)) {
+        score += 15;
+        careerRelevance = true;
+      }
+    }
+    
+    // Check description for career keyword matches
+    for (const keyword of careerKeywords) {
+      if (description.includes(keyword)) {
+        score += 8;
+        careerRelevance = true;
+      }
+    }
+    
+    // Check title for interest matches
     for (const interest of interests) {
-      if (event.title.toLowerCase().includes(interest)) {
-        score += 20;
+      if (title.includes(interest)) {
+        score += 12;
       }
     }
     
     // Check description for interest matches
     for (const interest of interests) {
-      if (event.description.toLowerCase().includes(interest)) {
-        score += 10;
+      if (description.includes(interest)) {
+        score += 6;
       }
     }
     
-    // Check categories for interest matches
+    // Check categories for career and interest matches
     for (const category of event.categories) {
+      const lowercaseCategory = category.toLowerCase();
+      
+      // Check for career relevance
+      for (const keyword of careerKeywords) {
+        if (lowercaseCategory.includes(keyword)) {
+          score += 10;
+          careerRelevance = true;
+        }
+      }
+      
+      // Check for interest matches
       for (const interest of interests) {
-        if (category.toLowerCase().includes(interest)) {
-          score += 15;
+        if (lowercaseCategory.includes(interest)) {
+          score += 8;
         }
       }
     }
@@ -493,6 +604,13 @@ function calculateRelevanceScores(
     // Give bonus for preferred event types based on personality
     if (preferredTypes.includes(event.type)) {
       score += 10;
+    }
+    
+    // Major bonus for events with obvious career relevance
+    if (careerRelevance) {
+      score += 20;
+    } else {
+      score -= 20; // Penalty for non-career events
     }
     
     // Ensure score is within range 0-100
@@ -503,6 +621,9 @@ function calculateRelevanceScores(
       relevanceScore: score
     };
   });
+  
+  // Filter out very low scoring events (likely not career-related)
+  return scoredEvents.filter(event => event.relevanceScore >= 40);
 }
 
 /**
