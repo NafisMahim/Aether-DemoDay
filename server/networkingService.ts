@@ -2189,8 +2189,10 @@ export async function searchPredictHQEvents(
         description = description.substring(0, 297) + '...';
       }
       
-      // Generate a URL if one is not provided
-      const url = `https://predicthq.com/events/${event.id}`;
+      // Generate a URL for the event
+      // Note: Direct event links like https://predicthq.com/events/[ID] don't work publicly
+      // Instead, use a search URL or the PredictHQ homepage
+      const url = `https://predicthq.com`;
       
       return {
         id: event.id,

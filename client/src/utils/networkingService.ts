@@ -15,7 +15,7 @@ export interface NetworkingEvent {
   url: string;
   type: "conference" | "workshop" | "meetup" | "concert" | "sporting" | "networking" | "other";
   categories: string[];
-  source: "eventbrite" | "ticketmaster" | "meraki" | "generated";
+  source: "eventbrite" | "ticketmaster" | "meraki" | "predicthq" | "generated" | "webscrape" | "google";
   image?: string;
   relevanceScore?: number;
 }
@@ -40,10 +40,18 @@ export async function fetchNetworkingEvents(
   apiStatus?: {
     eventbrite: string;
     ticketmaster: string;
+    predicthq: string;
+    google: string;
+    webscrape: string;
+    meraki: string;
   };
   sources?: {
     eventbrite: number;
     ticketmaster: number;
+    predicthq: number;
+    google: number;
+    webscrape: number;
+    meraki: number;
   };
 }> {
   try {
@@ -86,6 +94,22 @@ export async function searchNetworkingEvents(
   events: NetworkingEvent[];
   count: number;
   message: string;
+  apiStatus?: {
+    eventbrite: string;
+    ticketmaster: string;
+    predicthq: string;
+    google: string;
+    webscrape: string;
+    meraki: string;
+  };
+  sources?: {
+    eventbrite: number;
+    ticketmaster: number;
+    predicthq: number;
+    google: number;
+    webscrape: number;
+    meraki: number;
+  };
 }> {
   try {
     // Convert search terms to career interests format for API

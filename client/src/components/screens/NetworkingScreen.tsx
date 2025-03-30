@@ -568,10 +568,16 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
         return <Badge variant="outline" className="text-xs bg-blue-50">Ticketmaster</Badge>
       case 'meraki':
         return <Badge variant="outline" className="text-xs bg-green-50">Meraki</Badge>
+      case 'predicthq':
+        return <Badge variant="outline" className="text-xs bg-yellow-50">PredictHQ</Badge>
+      case 'google':
+        return <Badge variant="outline" className="text-xs bg-red-50">Google</Badge>
+      case 'webscrape':
+        return <Badge variant="outline" className="text-xs bg-teal-50">Web</Badge>
       case 'generated':
         return <Badge variant="outline" className="text-xs bg-purple-50">AI Recommended</Badge>
       default:
-        return null
+        return <Badge variant="outline" className="text-xs bg-gray-50">{source || 'Unknown'}</Badge>
     }
   }
   
@@ -704,27 +710,55 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
                       </div>
                       
                       <div className="flex gap-2">
-                        <Button 
-                          variant="default" 
-                          size="sm" 
-                          className="text-xs h-8"
-                          asChild
-                        >
-                          <a href={opportunity.url} target="_blank" rel="noopener noreferrer">
-                            <span>Apply</span>
-                          </a>
-                        </Button>
+                        {opportunity.source === 'predicthq' ? (
+                          // Special handling for PredictHQ events - direct to search
+                          <Button 
+                            variant="default" 
+                            size="sm" 
+                            className="text-xs h-8"
+                            onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(opportunity.title + ' ' + opportunity.date)}`, '_blank')}
+                          >
+                            <span>Find Event</span>
+                          </Button>
+                        ) : (
+                          // Regular handling for other event sources
+                          <Button 
+                            variant="default" 
+                            size="sm" 
+                            className="text-xs h-8"
+                            asChild
+                          >
+                            <a href={opportunity.url} target="_blank" rel="noopener noreferrer">
+                              <span>Apply</span>
+                            </a>
+                          </Button>
+                        )}
                         
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="text-xs h-8"
-                          asChild
-                        >
-                          <a href={opportunity.url} target="_blank" rel="noopener noreferrer">
-                            <span>More</span>
-                          </a>
-                        </Button>
+                        {opportunity.source === 'predicthq' ? (
+                          // Special handling for PredictHQ events - direct to PredictHQ homepage
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-xs h-8"
+                            asChild
+                          >
+                            <a href="https://predicthq.com" target="_blank" rel="noopener noreferrer">
+                              <span>More</span>
+                            </a>
+                          </Button>
+                        ) : (
+                          // Regular handling for other event sources
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-xs h-8"
+                            asChild
+                          >
+                            <a href={opportunity.url} target="_blank" rel="noopener noreferrer">
+                              <span>More</span>
+                            </a>
+                          </Button>
+                        )}
                       </div>
                     </CardFooter>
                   </Card>
