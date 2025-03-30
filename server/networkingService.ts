@@ -160,89 +160,110 @@ export async function searchEventbriteEvents(
   location?: string
 ): Promise<NetworkingEvent[]> {
   try {
-    // Try to get user information first
-    console.log(`[Eventbrite] Attempting to verify user authentication...`);
-    
-    // First, verify the authentication by getting user data
-    let userResponse;
-    try {
-      const userUrl = `https://www.eventbriteapi.com/v3/users/me/?token=${EVENTBRITE_TOKEN}`;
-      console.log(`[Eventbrite] Getting user info with URL: ${userUrl.replace(EVENTBRITE_TOKEN || '', '***')}`);
-      
-      userResponse = await axios.get(userUrl, {
-        validateStatus: (status) => status < 500,
-      });
-      
-      console.log(`[Eventbrite] User info status: ${userResponse.status}`);
-      
-      if (userResponse.data && userResponse.data.error) {
-        console.error(`[Eventbrite] User info error: ${userResponse.data.error} - ${userResponse.data.error_description}`);
-        return [];
-      }
-    } catch (error) {
-      console.error('[Eventbrite] Error fetching user info:', error);
+    if (!EVENTBRITE_TOKEN) {
+      console.error('[Eventbrite] No API token available');
       return [];
     }
     
-    // Now try to search for events
-    // Approach 1: search by organizer (more likely to find events)
-    const organizerId = EVENTBRITE_USER_ID; // Using the provided user ID
-    let url = `https://www.eventbriteapi.com/v3/organizers/${organizerId}/events/`;
+    console.log(`[Eventbrite] Searching for career-related events...`);
     
-    // Try to find public events for this user
-    console.log(`[Eventbrite] Attempting to fetch events with URL: ${url}`);
+    // Prepare search parameters
+    const params = new URLSearchParams();
     
-    // Make API request to Eventbrite
-    const response = await axios.get(url, {
+    // Add career-focused keywords for better results
+    // We'll use a career-focused search term combined with the user's interests
+    const careerTerms = ['conference', 'networking', 'professional', 'business', 'career'];
+    
+    // Add user interests to search terms, filtered to avoid special characters
+    const filteredInterests = interestKeywords
+      .filter(keyword => 
+        keyword.length < 50 && 
+        !keyword.includes("'re") && 
+        !keyword.includes(".")
+      )
+      .slice(0, 3); // Limit to first 3 interests to avoid overly specific queries
+      
+    // Combine with career terms
+    const searchTerms = [...careerTerms, ...filteredInterests];
+    
+    // Create a good search query by joining terms
+    const searchQuery = searchTerms.join(' ');
+    params.append('q', searchQuery);
+    
+    // Set categories to business, career or networking categories
+    // 101 = Business, 102 = Science & Tech
+    params.append('categories', '101,102');
+    
+    // Sort by date
+    params.append('sort_by', 'date');
+    
+    // Limit results
+    params.append('expand', 'venue');
+    
+    // Add location if provided
+    if (location) {
+      params.append('location.address', location);
+      params.append('location.within', '50mi');
+    }
+    
+    // Set future events only
+    const today = new Date().toISOString().split('T')[0];
+    params.append('start_date.range_start', today);
+    
+    // Build the URL with search parameters
+    const searchUrl = `https://www.eventbriteapi.com/v3/events/search?${params.toString()}`;
+    console.log(`[Eventbrite] Searching with URL: ${searchUrl}`);
+    
+    // Make the API request
+    const response = await axios.get(searchUrl, {
       headers: {
         'Authorization': `Bearer ${EVENTBRITE_TOKEN}`
       },
-      validateStatus: (status) => status < 500, // Accept any status code less than 500 to handle 404s gracefully
+      timeout: 8000,
+      validateStatus: (status) => status < 500 // Accept any status code less than 500
     });
     
     // Check if the response contains an error
     if (response.data && response.data.error) {
-      console.error(`[Eventbrite] API Error: ${response.data.error} - ${response.data.error_description}`);
+      console.error(`[Eventbrite] Search API Error: ${response.data.error} - ${response.data.error_description}`);
       
-      // Try alternative approach - get events by user directly
+      // Try fallback search without category filters if the first attempt failed
       try {
-        const altUrl = `https://www.eventbriteapi.com/v3/users/${EVENTBRITE_USER_ID}/owned_events/`;
-        console.log(`[Eventbrite] Trying alternative URL: ${altUrl}`);
+        console.log('[Eventbrite] Trying simplified fallback search...');
+        const simplifiedParams = new URLSearchParams();
+        simplifiedParams.append('q', 'business conference networking');
         
-        const altResponse = await axios.get(altUrl, {
+        const fallbackUrl = `https://www.eventbriteapi.com/v3/events/search?${simplifiedParams.toString()}`;
+        
+        const fallbackResponse = await axios.get(fallbackUrl, {
           headers: {
             'Authorization': `Bearer ${EVENTBRITE_TOKEN}`
           },
-          validateStatus: (status) => status < 500,
+          timeout: 8000,
+          validateStatus: (status) => status < 500
         });
         
-        if (altResponse.data && altResponse.data.error) {
-          console.error(`[Eventbrite] Alternative API Error: ${altResponse.data.error} - ${altResponse.data.error_description}`);
-          return [];
+        if (fallbackResponse.data && fallbackResponse.data.events && Array.isArray(fallbackResponse.data.events)) {
+          console.log(`[Eventbrite] Fallback search found ${fallbackResponse.data.events.length} events`);
+          return processEventbriteEvents(fallbackResponse.data.events);
         }
-        
-        // Process events from alternative approach
-        if (altResponse.data && altResponse.data.events && Array.isArray(altResponse.data.events)) {
-          console.log(`[Eventbrite] Successfully fetched ${altResponse.data.events.length} events via alternative URL`);
-          return processEventbriteEvents(altResponse.data.events);
-        }
-      } catch (altError) {
-        console.error('[Eventbrite] Error with alternative approach:', altError);
-        return [];
+      } catch (fallbackError) {
+        console.error('[Eventbrite] Fallback search also failed:', fallbackError);
       }
       
       return [];
     }
     
-    // Map Eventbrite events to standardized format
+    // Extract events from response
     if (response.data && response.data.events && Array.isArray(response.data.events)) {
-      console.log(`[Eventbrite] Successfully fetched ${response.data.events.length} events`);
+      console.log(`[Eventbrite] Successfully found ${response.data.events.length} events via search API`);
       return processEventbriteEvents(response.data.events);
     }
     
+    console.log('[Eventbrite] Search returned no events');
     return [];
   } catch (error) {
-    console.error('Error fetching Eventbrite events:', error);
+    console.error('Error searching Eventbrite events:', error);
     return [];
   }
 }
@@ -250,22 +271,65 @@ export async function searchEventbriteEvents(
 // Helper function to process Eventbrite events
 function processEventbriteEvents(events: EventbriteEvent[]): NetworkingEvent[] {
   return events.map((event: EventbriteEvent) => {
-    // Determine event type based on Eventbrite category (simplified)
+    // Determine event type based on event name and description
     let type: NetworkingEvent['type'] = "other";
+    const title = event.name.text.toLowerCase();
+    const description = event.description?.text.toLowerCase() || '';
     
-    // Set default categories
+    // Categorize event type based on keywords in title and description
+    if (title.includes('conference') || title.includes('summit') || description.includes('conference')) {
+      type = "conference";
+    } else if (title.includes('workshop') || title.includes('training') || description.includes('workshop')) {
+      type = "workshop";
+    } else if (title.includes('networking') || title.includes('meetup') || description.includes('networking')) {
+      type = "networking";
+    } else if (title.includes('meetup') || description.includes('meetup')) {
+      type = "meetup";
+    } else {
+      // Default for business/professional events
+      type = "conference";
+    }
+    
+    // Extract categories from keywords in title and description
+    const categoryKeywords = [
+      'business', 'technology', 'leadership', 'professional', 'networking', 
+      'career', 'development', 'management', 'innovation', 'entrepreneurship'
+    ];
+    
     const categories: string[] = [];
+    
+    // Add relevant categories based on title keywords
+    categoryKeywords.forEach(keyword => {
+      if (title.includes(keyword) || description.includes(keyword)) {
+        // Capitalize first letter
+        const category = keyword.charAt(0).toUpperCase() + keyword.slice(1);
+        if (!categories.includes(category)) {
+          categories.push(category);
+        }
+      }
+    });
+    
+    // Add a default category if none were found
+    if (categories.length === 0) {
+      categories.push('Professional Development');
+    }
     
     // Extract time information
     const dateObj = event.start ? new Date(event.start.local) : new Date();
     const date = dateObj.toISOString().split('T')[0];
     const time = event.start ? event.start.local.split('T')[1].substring(0, 5) : undefined;
     
+    // Format a clean description (truncate if too long)
+    let cleanDescription = event.description ? event.description.text : 'No description available';
+    if (cleanDescription.length > 200) {
+      cleanDescription = cleanDescription.substring(0, 200) + '...';
+    }
+    
     // Map to standardized event format
     return {
       id: event.id,
       title: event.name.text,
-      description: event.description ? event.description.text.substring(0, 200) + '...' : 'No description available',
+      description: cleanDescription,
       date,
       time,
       venue: event.venue?.name,

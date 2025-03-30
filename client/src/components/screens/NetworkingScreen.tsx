@@ -292,7 +292,9 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
         url: "https://meetup.com/tech-innovators",
         relevanceScore: 92,
         industry: "Technology",
-        tags: ["Technology", "Innovation", "Networking"]
+        tags: ["Technology", "Innovation", "Networking"],
+        location: "San Francisco, CA",
+        date: "Apr 15, 2025"
       },
       {
         id: "net2",
@@ -302,7 +304,9 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
         url: "https://discord.gg/women-in-design",
         relevanceScore: 85,
         industry: "Design",
-        tags: ["Design", "Community", "Mentorship"]
+        tags: ["Design", "Community", "Mentorship"],
+        location: "Online",
+        date: "Ongoing"
       },
       {
         id: "net3",
@@ -312,7 +316,9 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
         url: "https://productfellowship.org",
         relevanceScore: 78,
         industry: "Product",
-        tags: ["Product Management", "Leadership", "Career Development"]
+        tags: ["Product Management", "Leadership", "Career Development"],
+        location: "Boston, MA",
+        date: "May 20, 2025"
       },
       {
         id: "net4",
@@ -323,6 +329,7 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
         relevanceScore: 89,
         industry: "Creative",
         tags: ["Creative", "Mentorship", "Career Development"],
+        location: "New York, NY",
         date: "Applications open May 1, 2025"
       },
       {
@@ -333,7 +340,9 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
         url: "https://youngleadersnetwork.org",
         relevanceScore: 75,
         industry: "Cross-industry",
-        tags: ["Leadership", "Networking", "Professional Development"]
+        tags: ["Leadership", "Networking", "Professional Development"],
+        location: "Chicago, IL",
+        date: "Ongoing"
       }
     ];
   }, [networkingData])
@@ -632,14 +641,14 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
             ) : (
               <div className="grid gap-4 md:grid-cols-2">
                 {filteredOpportunities.map((opportunity) => (
-                  <Card key={opportunity.id} className="overflow-hidden">
+                  <Card key={opportunity.id} className="overflow-hidden flex flex-col h-full">
                     <CardHeader className="pb-2">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-2">
                           {getOpportunityIcon(opportunity.type)}
                           <CardTitle className="text-base">{opportunity.title}</CardTitle>
                         </div>
-                        <Badge>{opportunity.industry}</Badge>
+                        <Badge className="whitespace-nowrap">{opportunity.industry}</Badge>
                       </div>
                       {opportunity.date && (
                         <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
@@ -648,16 +657,19 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
                         </div>
                       )}
                     </CardHeader>
-                    <CardContent className="pb-2">
-                      <div className="text-sm text-muted-foreground line-clamp-3">
+                    
+                    <CardContent className="pb-2 flex-grow">
+                      <div className="text-sm text-muted-foreground mb-3 line-clamp-3">
                         {opportunity.description}
                       </div>
+                      
                       {opportunity.location && (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
-                          <Building className="h-3 w-3" />
-                          <span>{opportunity.location}</span>
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground mb-3">
+                          <Building className="h-3 w-3 flex-shrink-0" />
+                          <span className="line-clamp-1">{opportunity.location}</span>
                         </div>
                       )}
+                      
                       <div className="flex flex-wrap gap-1 mt-2">
                         {opportunity.tags.slice(0, 3).map((tag, idx) => (
                           <Badge key={idx} variant="outline" className="text-xs">
@@ -666,27 +678,42 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
                         ))}
                       </div>
                     </CardContent>
-                    <CardFooter className="flex justify-between pt-2">
-                      <div className="flex items-center gap-1.5">
+                    
+                    <CardFooter className="flex flex-col pt-2 gap-2">
+                      <div className="flex items-center gap-1.5 w-full">
                         <span className="text-xs font-medium">
                           {opportunity.relevanceScore}% Relevant
                         </span>
                         <Progress 
                           value={opportunity.relevanceScore} 
-                          className="h-1.5 w-16" 
+                          className="h-1.5 flex-grow" 
                         />
                       </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="text-xs h-7 gap-1"
-                        asChild
-                      >
-                        <a href={opportunity.url} target="_blank" rel="noopener noreferrer">
-                          <span>Visit</span>
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
-                      </Button>
+                      
+                      <div className="flex w-full gap-2">
+                        <Button 
+                          variant="default" 
+                          size="sm" 
+                          className="text-xs h-8 gap-1 flex-grow"
+                          asChild
+                        >
+                          <a href={opportunity.url} target="_blank" rel="noopener noreferrer">
+                            <span>Apply</span>
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        </Button>
+                        
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="text-xs h-8"
+                          asChild
+                        >
+                          <a href={opportunity.url} target="_blank" rel="noopener noreferrer">
+                            <span>More Info</span>
+                          </a>
+                        </Button>
+                      </div>
                     </CardFooter>
                   </Card>
                 ))}
