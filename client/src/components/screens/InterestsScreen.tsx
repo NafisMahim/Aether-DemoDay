@@ -47,8 +47,13 @@ export default function InterestsScreen({ handleBack, interests, setUserData, na
     // Check from sessionStorage if quiz was completed
     const quizCompleted = sessionStorage.getItem('quizCompleted') === 'true'
     
-    setIsQuizCompleted(fromQuiz || quizCompleted)
-  }, [])
+    // Check if we have valid quiz results from props
+    const hasQuizResults = quizResults && 
+      Object.keys(quizResults).length > 0 && 
+      (quizResults.primaryType || quizResults.personalityType)
+    
+    setIsQuizCompleted(fromQuiz || quizCompleted || hasQuizResults)
+  }, [quizResults])
 
   const handleAddInterest = () => {
     if (newInterest.trim() === "") {

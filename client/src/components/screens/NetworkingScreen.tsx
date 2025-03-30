@@ -130,13 +130,22 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
   
   // Generate AI suggested connections based on quiz results
   const suggestedConnections = useMemo(() => {
-    // If no quiz results, return empty array
-    if (!quizResults || !quizResults.personalityType) return []
+    // If no quiz results, still provide suggestions but with generic tags
+    const hasQuizResults = quizResults && 
+      (quizResults.personalityType || quizResults.primaryType)
     
     // Based on personality type and career interests, generate relevant suggestions
-    const personalityType = quizResults.personalityType || ""
-    const strengths = quizResults.strengths || []
-    const careerInterests = quizResults.careerInterests || []
+    const personalityType = hasQuizResults 
+      ? (quizResults.personalityType || quizResults.primaryType || "")
+      : "Professional"
+    
+    const strengths = hasQuizResults && quizResults.strengths 
+      ? quizResults.strengths 
+      : ["Communication", "Leadership"]
+      
+    const careerInterests = hasQuizResults && quizResults.careerInterests 
+      ? quizResults.careerInterests 
+      : ["Technology", "Business"]
     
     // Generate titles and companies based on strengths and career interests
     const suggestions: Connection[] = [
