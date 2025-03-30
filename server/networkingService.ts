@@ -293,104 +293,43 @@ export async function searchTicketmasterEvents(
       console.error('[Ticketmaster] No API key available');
       return [];
     }
-
-    // Make the simplest possible request to just get ANY events
-    // This is to maximize chances of getting real data to display
     
-    // Base URL with minimal parameters
-    let url = 'https://app.ticketmaster.com/discovery/v2/events.json?';
+    // IMPORTANT: We'll use only one reliable approach for getting events
+    // Previous approach had issues with authorization
     
-    // Essential parameters:
-    // - size: number of results (keep it reasonable)
-    // - sort: upcoming events first
-    // - apikey: required for authentication
-    const params = new URLSearchParams({
-      size: '10',
-      sort: 'date,asc',
-      apikey: TICKETMASTER_KEY
-    });
-    
-    // Create four different search strategies to try in parallel
-    const searches = [
-      // 1. Conferences and business events
-      { ...params, keyword: 'conference,business,networking' },
+    try {
+      // Simple direct API call that matches how curl works
+      console.log('[Ticketmaster] Making direct API call');
+      const directUrl = `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${TICKETMASTER_KEY}&size=20`;
       
-      // 2. Technology events (workshops, hackathons)
-      { ...params, keyword: 'technology,workshop,innovation' },
+      // Log sanitized URL
+      const sanitizedUrl = directUrl.replace(TICKETMASTER_KEY, '***');
+      console.log(`[Ticketmaster] Direct API URL: ${sanitizedUrl}`);
       
-      // 3. Career development events
-      { ...params, keyword: 'career,development,professional' },
+      // Make the request - no extra headers, just like curl
+      const response = await axios.get(directUrl);
       
-      // 4. Location-based search (if provided)
-      location && location !== 'Not specified' 
-        ? { ...params, city: location, radius: '50', unit: 'miles' }
-        : null
-    ].filter(Boolean);
-    
-    console.log(`[Ticketmaster] Attempting ${searches.length} parallel search strategies`);
-    
-    // Try all search strategies in parallel
-    const searchPromises = searches.map(async (searchParams, index) => {
-      try {
-        // Convert params to string and append to URL
-        const searchUrl = url + new URLSearchParams(searchParams as Record<string, string>).toString();
+      // Process the response
+      if (response.data && response.data._embedded && response.data._embedded.events) {
+        const events = response.data._embedded.events;
+        console.log(`[Ticketmaster] Successfully fetched ${events.length} events directly`);
         
-        // Create a sanitized version for logging (hide API key)
-        const sanitizedUrl = searchUrl.replace(TICKETMASTER_KEY, '***');
-        console.log(`[Ticketmaster] Search strategy ${index+1}: ${sanitizedUrl}`);
-        
-        // Make the request
-        const response = await axios.get(searchUrl, {
-          validateStatus: (status) => status < 500,
-        });
-        
-        // Process results if successful
-        if (response.status === 200 && response.data._embedded && response.data._embedded.events) {
-          console.log(`[Ticketmaster] Strategy ${index+1} successful: found ${response.data._embedded.events.length} events`);
-          return processTicketmasterEvents(response.data._embedded.events);
-        } else {
-          console.log(`[Ticketmaster] Strategy ${index+1} failed or returned no events. Status: ${response.status}`);
-          return [];
-        }
-      } catch (error) {
-        console.error(`[Ticketmaster] Error in search strategy ${index+1}:`, error);
-        return [];
+        // Process and return the events
+        return processTicketmasterEvents(events);
+      } else {
+        console.log('[Ticketmaster] No events found in direct API response');
       }
-    });
-    
-    // Wait for all search strategies to complete
-    const results = await Promise.all(searchPromises);
-    
-    // Combine and deduplicate results
-    const allEvents = results.flat();
-    const uniqueEvents = allEvents.filter((event, index, self) => 
-      index === self.findIndex(e => e.id === event.id)
-    );
-    
-    console.log(`[Ticketmaster] Total events found: ${uniqueEvents.length}`);
-    
-    // If we still have no results, try one final simple search with minimal parameters
-    if (uniqueEvents.length === 0) {
-      try {
-        console.log('[Ticketmaster] Trying final fallback search');
-        const fallbackUrl = `https://app.ticketmaster.com/discovery/v2/events.json?size=10&apikey=${TICKETMASTER_KEY}`;
-        const sanitizedFallbackUrl = fallbackUrl.replace(TICKETMASTER_KEY, '***');
-        console.log(`[Ticketmaster] Fallback URL: ${sanitizedFallbackUrl}`);
-        
-        const fallbackResponse = await axios.get(fallbackUrl, {
-          validateStatus: (status) => status < 500
-        });
-        
-        if (fallbackResponse.status === 200 && fallbackResponse.data._embedded && fallbackResponse.data._embedded.events) {
-          console.log(`[Ticketmaster] Final fallback successful, found ${fallbackResponse.data._embedded.events.length} events`);
-          return processTicketmasterEvents(fallbackResponse.data._embedded.events);
-        }
-      } catch (fallbackError) {
-        console.error('[Ticketmaster] Final fallback search failed:', fallbackError);
+    } catch (directError: any) {
+      console.error(`[Ticketmaster] Direct API call failed: ${directError.message}`);
+      if (directError.response) {
+        console.error(`[Ticketmaster] Status: ${directError.response.status}`);
+        console.error(`[Ticketmaster] Data:`, directError.response.data);
       }
     }
     
-    return uniqueEvents;
+    // If we get here, we couldn't get events through the API
+    console.log('[Ticketmaster] Could not retrieve events from Ticketmaster API');
+    return [];
   } catch (error) {
     console.error('Error fetching Ticketmaster events:', error);
     return [];
@@ -400,69 +339,93 @@ export async function searchTicketmasterEvents(
 // Helper function to process Ticketmaster events
 function processTicketmasterEvents(events: TicketmasterEvent[]): NetworkingEvent[] {
   return events.map((event: TicketmasterEvent) => {
-    // Extract venue information
-    const venue = event._embedded?.venues?.[0];
-    
-    // Determine event type based on Ticketmaster classification
-    let type: NetworkingEvent['type'] = "other";
-    const segment = event.classifications?.[0]?.segment?.name?.toLowerCase() || '';
-    
-    if (segment.includes('conference') || segment.includes('business')) {
-      type = "conference";
-    } else if (segment.includes('workshop') || segment.includes('learning')) {
-      type = "workshop";
-    } else if (segment.includes('music') || segment.includes('concert')) {
-      type = "concert";
-    } else if (segment.includes('sports')) {
-      type = "sporting";
-    } else if (segment.includes('networking')) {
-      type = "networking";
-    } else if (segment.includes('meetup')) {
-      type = "meetup";
+    try {
+      // Extract venue information
+      const venue = event._embedded?.venues?.[0];
+      
+      // Determine event type based on Ticketmaster classification
+      let type: NetworkingEvent['type'] = "other";
+      const segment = event.classifications?.[0]?.segment?.name?.toLowerCase() || '';
+      
+      if (segment.includes('conference') || segment.includes('business')) {
+        type = "conference";
+      } else if (segment.includes('workshop') || segment.includes('learning')) {
+        type = "workshop";
+      } else if (segment.includes('music') || segment.includes('concert')) {
+        type = "concert";
+      } else if (segment.includes('sports')) {
+        type = "sporting";
+      } else if (segment.includes('networking')) {
+        type = "networking";
+      } else if (segment.includes('meetup')) {
+        type = "meetup";
+      }
+      
+      // Extract categories
+      const categories: string[] = [];
+      if (event.classifications?.[0]?.segment?.name) {
+        categories.push(event.classifications[0].segment.name);
+      }
+      if (event.classifications?.[0]?.genre?.name) {
+        categories.push(event.classifications[0].genre.name);
+      }
+      
+      // Extract date and time (with safer handling)
+      let date = new Date().toISOString().split('T')[0]; // Default to today
+      let time = "12:00"; // Default time
+      
+      // Try to get date information from the event
+      if (event.dates?.start?.localDate) {
+        date = event.dates.start.localDate;
+      }
+      
+      if (event.dates?.start?.localTime) {
+        time = event.dates.start.localTime.substring(0, 5);
+      }
+      
+      // Find the best image (prefer larger images)
+      let image: string | undefined;
+      if (event.images && event.images.length > 0) {
+        // Sort by size (width × height) and take the largest
+        const sortedImages = [...event.images].sort((a, b) => 
+          (b.width * b.height) - (a.width * a.height)
+        );
+        image = sortedImages[0].url;
+      }
+      
+      // Map to standardized event format
+      return {
+        id: event.id,
+        title: event.name,
+        description: event.description || event.info || 'No description available',
+        date,
+        time,
+        venue: venue?.name,
+        location: venue?.address?.line1,
+        city: venue?.city?.name,
+        state: venue?.state?.name,
+        country: venue?.country?.name,
+        url: event.url,
+        type,
+        categories,
+        source: "ticketmaster",
+        image
+      };
+    } catch (error) {
+      console.error('[NetworkingService] Error processing event:', error);
+      
+      // Return a minimal valid event in case of processing error
+      return {
+        id: event.id || `error-${Date.now()}`,
+        title: event.name || 'Event',
+        description: 'Event details unavailable',
+        date: new Date().toISOString().split('T')[0],
+        url: event.url || '#',
+        type: 'other',
+        categories: [],
+        source: 'ticketmaster',
+      };
     }
-    
-    // Extract categories
-    const categories: string[] = [];
-    if (event.classifications?.[0]?.segment?.name) {
-      categories.push(event.classifications[0].segment.name);
-    }
-    if (event.classifications?.[0]?.genre?.name) {
-      categories.push(event.classifications[0].genre.name);
-    }
-    
-    // Extract date and time
-    const dateObj = event.dates?.start ? new Date(event.dates.start.dateTime) : new Date();
-    const date = event.dates?.start?.localDate || dateObj.toISOString().split('T')[0];
-    const time = event.dates?.start?.localTime || dateObj.toISOString().split('T')[1]?.substring(0, 5);
-    
-    // Find the best image (prefer larger images)
-    let image: string | undefined;
-    if (event.images && event.images.length > 0) {
-      // Sort by size (width × height) and take the largest
-      const sortedImages = [...event.images].sort((a, b) => 
-        (b.width * b.height) - (a.width * a.height)
-      );
-      image = sortedImages[0].url;
-    }
-    
-    // Map to standardized event format
-    return {
-      id: event.id,
-      title: event.name,
-      description: event.description || event.info || 'No description available',
-      date,
-      time,
-      venue: venue?.name,
-      location: venue?.address?.line1,
-      city: venue?.city?.name,
-      state: venue?.state?.name,
-      country: venue?.country?.name,
-      url: event.url,
-      type,
-      categories,
-      source: "ticketmaster",
-      image
-    };
   });
 }
 
