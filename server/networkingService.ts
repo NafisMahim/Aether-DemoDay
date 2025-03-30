@@ -144,6 +144,7 @@ export interface NetworkingEvent {
   url: string;
   type: "conference" | "workshop" | "meetup" | "concert" | "sporting" | "networking" | "other";
   categories: string[];
+  industry?: string;
   source: "eventbrite" | "ticketmaster" | "generated";
   image?: string;
   relevanceScore?: number;
@@ -270,83 +271,203 @@ export async function searchEventbriteEvents(
 
 // Helper function to process Eventbrite events
 function processEventbriteEvents(events: EventbriteEvent[]): NetworkingEvent[] {
-  return events.map((event: EventbriteEvent) => {
-    // Determine event type based on event name and description
-    let type: NetworkingEvent['type'] = "other";
-    const title = event.name.text.toLowerCase();
-    const description = event.description?.text.toLowerCase() || '';
-    
-    // Categorize event type based on keywords in title and description
-    if (title.includes('conference') || title.includes('summit') || description.includes('conference')) {
-      type = "conference";
-    } else if (title.includes('workshop') || title.includes('training') || description.includes('workshop')) {
-      type = "workshop";
-    } else if (title.includes('networking') || title.includes('meetup') || description.includes('networking')) {
-      type = "networking";
-    } else if (title.includes('meetup') || description.includes('meetup')) {
-      type = "meetup";
-    } else {
-      // Default for business/professional events
-      type = "conference";
-    }
-    
-    // Extract categories from keywords in title and description
-    const categoryKeywords = [
-      'business', 'technology', 'leadership', 'professional', 'networking', 
-      'career', 'development', 'management', 'innovation', 'entrepreneurship'
-    ];
-    
-    const categories: string[] = [];
-    
-    // Add relevant categories based on title keywords
-    categoryKeywords.forEach(keyword => {
-      if (title.includes(keyword) || description.includes(keyword)) {
-        // Capitalize first letter
-        const category = keyword.charAt(0).toUpperCase() + keyword.slice(1);
-        if (!categories.includes(category)) {
-          categories.push(category);
+  // First filter events to ensure they're not in the past
+  const now = new Date();
+  
+  // Process events with improved classification
+  return events
+    .filter(event => {
+      // Filter out events with missing critical data
+      if (!event.name || !event.url) {
+        return false;
+      }
+      
+      // Check if event has a date and it's not in the past
+      if (event.start?.local) {
+        const eventDate = new Date(event.start.local);
+        // Also filter out events more than 5 years in the future (likely data errors)
+        const fiveYearsFromNow = new Date();
+        fiveYearsFromNow.setFullYear(fiveYearsFromNow.getFullYear() + 5);
+        
+        return eventDate >= now && eventDate <= fiveYearsFromNow;
+      }
+      
+      // Include events without dates (we'll assign today's date)
+      return true;
+    })
+    .map((event: EventbriteEvent) => {
+      // Determine event type based on event name and description
+      let type: NetworkingEvent['type'] = "other";
+      const title = event.name.text.toLowerCase();
+      const description = event.description?.text.toLowerCase() || '';
+      
+      // More comprehensive event type categorization
+      if (
+        title.includes('conference') || 
+        title.includes('summit') || 
+        title.includes('forum') || 
+        title.includes('congress') ||
+        description.includes('conference') ||
+        description.includes('industry leaders')
+      ) {
+        type = "conference";
+      } 
+      else if (
+        title.includes('workshop') || 
+        title.includes('training') || 
+        title.includes('course') || 
+        title.includes('class') || 
+        title.includes('seminar') ||
+        description.includes('workshop') ||
+        description.includes('hands-on')
+      ) {
+        type = "workshop";
+      } 
+      else if (
+        title.includes('networking') || 
+        title.includes('mixer') || 
+        title.includes('social') || 
+        title.includes('connect') ||
+        description.includes('networking') ||
+        description.includes('connect with peers')
+      ) {
+        type = "networking";
+      } 
+      else if (
+        title.includes('meetup') || 
+        title.includes('meet-up') ||
+        description.includes('meetup')
+      ) {
+        type = "meetup";
+      }
+      else if (
+        title.includes('career fair') ||
+        title.includes('job fair') ||
+        title.includes('recruitment') ||
+        title.includes('hiring') ||
+        description.includes('career opportunities') ||
+        description.includes('job seekers')
+      ) {
+        type = "networking";  // Categorize job fairs as networking events
+      } 
+      else {
+        // Default for business/professional events
+        type = "conference";
+      }
+      
+      // Extract categories from keywords in title and description
+      const categoryKeywords = [
+        'business', 'technology', 'leadership', 'professional', 'networking', 
+        'career', 'development', 'management', 'innovation', 'entrepreneurship',
+        'hr', 'human resources', 'finance', 'marketing', 'sales', 'education',
+        'healthcare', 'engineering', 'design', 'startup', 'tech', 'digital'
+      ];
+      
+      const categories: string[] = [];
+      
+      // Add relevant categories based on title keywords
+      categoryKeywords.forEach(keyword => {
+        if (title.includes(keyword) || description.includes(keyword)) {
+          // Capitalize first letter and normalize multi-word categories
+          let category: string;
+          if (keyword === 'hr') {
+            category = 'Human Resources';
+          } else if (keyword === 'human resources') {
+            category = 'Human Resources';
+          } else if (keyword === 'tech') {
+            category = 'Technology';
+          } else {
+            category = keyword.charAt(0).toUpperCase() + keyword.slice(1);
+          }
+          
+          if (!categories.includes(category)) {
+            categories.push(category);
+          }
+        }
+      });
+      
+      // Add a default category if none were found
+      if (categories.length === 0) {
+        categories.push('Professional Development');
+      }
+      
+      // Generate industry label based on categories and title
+      const industryByKeyword: Record<string, string> = {
+        'tech': 'Technology',
+        'technology': 'Technology',
+        'business': 'Business',
+        'finance': 'Finance',
+        'marketing': 'Marketing',
+        'education': 'Education',
+        'healthcare': 'Healthcare',
+        'health': 'Healthcare',
+        'hr': 'Human Resources',
+        'human resources': 'Human Resources',
+        'design': 'Design',
+        'creative': 'Creative',
+        'engineering': 'Engineering',
+        'developer': 'Technology',
+        'leadership': 'Leadership',
+        'management': 'Management',
+        'career': 'Career Development',
+        'startup': 'Entrepreneurship',
+        'entrepreneur': 'Entrepreneurship'
+      };
+      
+      // Determine industry from title
+      let industry = 'Professional Development'; // Default
+      
+      // Check title for industry keywords
+      for (const [keyword, industryLabel] of Object.entries(industryByKeyword)) {
+        if (title.includes(keyword)) {
+          industry = industryLabel;
+          break;
         }
       }
-    });
-    
-    // Add a default category if none were found
-    if (categories.length === 0) {
-      categories.push('Professional Development');
-    }
-    
-    // Extract time information
-    const dateObj = event.start ? new Date(event.start.local) : new Date();
-    const date = dateObj.toISOString().split('T')[0];
-    const time = event.start ? event.start.local.split('T')[1].substring(0, 5) : undefined;
-    
-    // Format a clean description (truncate if too long)
-    let cleanDescription = event.description ? event.description.text : 'No description available';
-    if (cleanDescription.length > 200) {
-      cleanDescription = cleanDescription.substring(0, 200) + '...';
-    }
-    
-    // Map to standardized event format
-    return {
-      id: event.id,
-      title: event.name.text,
-      description: cleanDescription,
-      date,
-      time,
-      venue: event.venue?.name,
-      location: event.venue?.address ? 
-        [
+      
+      // Extract time information
+      const dateObj = event.start ? new Date(event.start.local) : new Date();
+      const date = dateObj.toISOString().split('T')[0];
+      const time = event.start ? event.start.local.split('T')[1].substring(0, 5) : undefined;
+      
+      // Format a clean description (truncate if too long)
+      let cleanDescription = event.description ? event.description.text : 'No description available';
+      if (cleanDescription.length > 300) {
+        cleanDescription = cleanDescription.substring(0, 300) + '...';
+      }
+      
+      // Determine location from venue data
+      let location = undefined;
+      if (event.venue?.address) {
+        location = [
           event.venue.address.address_1,
           event.venue.address.address_2
-        ].filter(Boolean).join(', ') : undefined,
-      city: event.venue?.address?.city,
-      state: event.venue?.address?.region,
-      country: event.venue?.address?.country,
-      url: event.url,
-      type,
-      categories,
-      source: "eventbrite"
-    };
-  });
+        ].filter(Boolean).join(', ');
+      }
+      
+      if (!location && event.venue?.name) {
+        location = event.venue.name;
+      }
+      
+      // Map to standardized event format
+      return {
+        id: event.id,
+        title: event.name.text,
+        description: cleanDescription,
+        date,
+        time,
+        venue: event.venue?.name,
+        location,
+        city: event.venue?.address?.city,
+        state: event.venue?.address?.region,
+        country: event.venue?.address?.country,
+        url: event.url,
+        type,
+        categories,
+        industry,
+        source: "eventbrite"
+      };
+    });
 }
 
 /**
@@ -372,7 +493,15 @@ export async function searchTicketmasterEvents(
       !keyword.includes(".")
     );
     
-    // Career-focused search strategies - from specific to general
+    // Get current date in format YYYY-MM-DD
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Generate a future date range (6 months ahead)
+    const sixMonthsFromNow = new Date();
+    sixMonthsFromNow.setMonth(sixMonthsFromNow.getMonth() + 6);
+    const endDate = sixMonthsFromNow.toISOString().split('T')[0];
+    
+    // Career-focused search strategies with upcoming date filter - from specific to general
     const searchStrategies = [
       // Strategy 1: Business and conference focus
       {
@@ -396,7 +525,7 @@ export async function searchTicketmasterEvents(
       },
       // Strategy 5: General events (fallback)
       {
-        keywords: "",
+        keywords: "conference",
         size: 30
       }
     ];
@@ -414,12 +543,20 @@ export async function searchTicketmasterEvents(
         const params = new URLSearchParams({
           apikey: TICKETMASTER_KEY,
           size: strategy.size.toString(),
-          sort: 'date,asc'
+          sort: 'date,asc',
+          startDateTime: `${today}T00:00:00Z`,
+          endDateTime: `${endDate}T23:59:59Z`,
+          classificationName: 'conference,business,meeting'
         });
         
         // Add keywords if present
         if (strategy.keywords) {
           params.append('keyword', strategy.keywords);
+        }
+        
+        // Add location if provided
+        if (location) {
+          params.append('city', location);
         }
         
         const apiUrl = `https://app.ticketmaster.com/discovery/v2/events.json?${params.toString()}`;
@@ -456,6 +593,33 @@ export async function searchTicketmasterEvents(
     
     if (allEvents.length === 0) {
       console.log('[Ticketmaster] No events found from any search strategy');
+      
+      // Try one last attempt with minimal filters
+      try {
+        console.log('[Ticketmaster] Trying final fallback search with minimal filters');
+        
+        const fallbackParams = new URLSearchParams({
+          apikey: TICKETMASTER_KEY,
+          size: "50",
+          sort: 'date,asc',
+          startDateTime: `${today}T00:00:00Z`,
+        });
+        
+        const fallbackUrl = `https://app.ticketmaster.com/discovery/v2/events.json?${fallbackParams.toString()}`;
+        const response = await axios.get(fallbackUrl, { timeout: 5000 });
+        
+        if (response.data && response.data._embedded && response.data._embedded.events) {
+          const events = response.data._embedded.events;
+          console.log(`[Ticketmaster] Fallback search found ${events.length} events`);
+          allEvents = events;
+        }
+      } catch (fallbackError) {
+        console.error('[Ticketmaster] Fallback search failed:', fallbackError);
+        return [];
+      }
+    }
+    
+    if (allEvents.length === 0) {
       return [];
     }
     
@@ -469,95 +633,238 @@ export async function searchTicketmasterEvents(
 
 // Helper function to process Ticketmaster events
 function processTicketmasterEvents(events: TicketmasterEvent[]): NetworkingEvent[] {
-  return events.map((event: TicketmasterEvent) => {
-    try {
-      // Extract venue information
-      const venue = event._embedded?.venues?.[0];
-      
-      // Determine event type based on Ticketmaster classification
-      let type: NetworkingEvent['type'] = "other";
-      const segment = event.classifications?.[0]?.segment?.name?.toLowerCase() || '';
-      
-      if (segment.includes('conference') || segment.includes('business')) {
-        type = "conference";
-      } else if (segment.includes('workshop') || segment.includes('learning')) {
-        type = "workshop";
-      } else if (segment.includes('music') || segment.includes('concert')) {
-        type = "concert";
-      } else if (segment.includes('sports')) {
-        type = "sporting";
-      } else if (segment.includes('networking')) {
-        type = "networking";
-      } else if (segment.includes('meetup')) {
-        type = "meetup";
+  // First filter events to ensure they're not in the past
+  const now = new Date();
+  
+  // Convert to array with more data assessment
+  return events
+    .filter(event => {
+      // Filter out events with missing critical data
+      if (!event.name || !event.url) {
+        return false;
       }
       
-      // Extract categories
-      const categories: string[] = [];
-      if (event.classifications?.[0]?.segment?.name) {
-        categories.push(event.classifications[0].segment.name);
-      }
-      if (event.classifications?.[0]?.genre?.name) {
-        categories.push(event.classifications[0].genre.name);
-      }
-      
-      // Extract date and time (with safer handling)
-      let date = new Date().toISOString().split('T')[0]; // Default to today
-      let time = "12:00"; // Default time
-      
-      // Try to get date information from the event
+      // Make sure event has a date and it's not in the past
       if (event.dates?.start?.localDate) {
-        date = event.dates.start.localDate;
+        const eventDate = new Date(event.dates.start.localDate);
+        // Filter out events more than 5 years in the future (likely data errors)
+        const fiveYearsFromNow = new Date();
+        fiveYearsFromNow.setFullYear(fiveYearsFromNow.getFullYear() + 5);
+        
+        return eventDate >= now && eventDate <= fiveYearsFromNow;
       }
       
-      if (event.dates?.start?.localTime) {
-        time = event.dates.start.localTime.substring(0, 5);
+      // If no date available, include it (we'll assign today's date)
+      return true;
+    })
+    .map((event: TicketmasterEvent) => {
+      try {
+        // Extract venue information
+        const venue = event._embedded?.venues?.[0];
+        
+        // More detailed event type determination based on all available data
+        let type: NetworkingEvent['type'] = "other";
+        
+        // Use classifications
+        const segment = event.classifications?.[0]?.segment?.name?.toLowerCase() || '';
+        const genre = event.classifications?.[0]?.genre?.name?.toLowerCase() || '';
+        const subGenre = event.classifications?.[0]?.subGenre?.name?.toLowerCase() || '';
+        
+        // Also check title and description for keywords
+        const title = event.name.toLowerCase();
+        const description = (event.description || event.info || '').toLowerCase();
+        
+        // Comprehensive checks for event type determination
+        if (
+          segment.includes('conference') || 
+          segment.includes('business') ||
+          title.includes('conference') ||
+          title.includes('summit') ||
+          title.includes('forum') ||
+          title.includes('congress') ||
+          description.includes('conference') ||
+          description.includes('industry leaders')
+        ) {
+          type = "conference";
+        } 
+        else if (
+          segment.includes('workshop') || 
+          segment.includes('learning') ||
+          title.includes('workshop') ||
+          title.includes('training') ||
+          title.includes('course') ||
+          title.includes('class') ||
+          title.includes('seminar') ||
+          description.includes('workshop') ||
+          description.includes('hands-on')
+        ) {
+          type = "workshop";
+        } 
+        else if (
+          title.includes('networking') ||
+          title.includes('meetup') ||
+          title.includes('meet-up') ||
+          title.includes('mixer') ||
+          title.includes('social') ||
+          title.includes('connect') ||
+          description.includes('networking') ||
+          description.includes('connect with peers')
+        ) {
+          type = "networking";
+        }
+        else if (
+          title.includes('career fair') ||
+          title.includes('job fair') ||
+          title.includes('recruitment') ||
+          title.includes('hiring') ||
+          description.includes('career opportunities') ||
+          description.includes('job seekers')
+        ) {
+          type = "networking";  // Categorize job fairs as networking events
+        }
+        // Only categorize as concerts if clearly music-focused
+        else if (
+          (segment.includes('music') || segment.includes('concert')) &&
+          !title.includes('business') &&
+          !title.includes('professional') &&
+          !title.includes('career')
+        ) {
+          type = "concert";
+        } 
+        // Only categorize as sporting events if clearly sports-focused
+        else if (
+          (segment.includes('sports') || title.includes('game') || title.includes('match')) &&
+          !title.includes('business') &&
+          !title.includes('professional') &&
+          !title.includes('career')
+        ) {
+          type = "sporting";
+        }
+        
+        // Extract more detailed categories based on all event info
+        const categories: string[] = [];
+        
+        // Add formal classifications if available
+        if (event.classifications?.[0]?.segment?.name) {
+          categories.push(event.classifications[0].segment.name);
+        }
+        if (event.classifications?.[0]?.genre?.name) {
+          categories.push(event.classifications[0].genre.name);
+        }
+        
+        // Add derived categories from title keywords
+        if (title.includes('business')) categories.push('Business');
+        if (title.includes('tech') || title.includes('technology')) categories.push('Technology');
+        if (title.includes('career') || title.includes('job')) categories.push('Career Development');
+        if (title.includes('leadership')) categories.push('Leadership');
+        if (title.includes('entrepreneur')) categories.push('Entrepreneurship');
+        if (title.includes('hr') || title.includes('human resources')) categories.push('Human Resources');
+        if (title.includes('marketing')) categories.push('Marketing');
+        if (title.includes('finance')) categories.push('Finance');
+        if (title.includes('healthcare') || title.includes('health')) categories.push('Healthcare');
+        if (title.includes('education')) categories.push('Education');
+        
+        // Add industry category based on venue if available
+        if (venue?.name?.includes('Convention')) categories.push('Convention');
+        if (venue?.name?.includes('University') || venue?.name?.includes('College')) categories.push('Education');
+        
+        // Extract date and time (with safer handling)
+        let date = new Date().toISOString().split('T')[0]; // Default to today
+        let time = "12:00"; // Default time
+        
+        // Try to get date information from the event
+        if (event.dates?.start?.localDate) {
+          date = event.dates.start.localDate;
+        }
+        
+        if (event.dates?.start?.localTime) {
+          time = event.dates.start.localTime.substring(0, 5);
+        }
+        
+        // Find the best image (prefer larger images)
+        let image: string | undefined;
+        if (event.images && event.images.length > 0) {
+          // Sort by size (width × height) and take the largest
+          const sortedImages = [...event.images].sort((a, b) => 
+            (b.width * b.height) - (a.width * a.height)
+          );
+          image = sortedImages[0].url;
+        }
+        
+        // Determine location from venue data
+        let location = venue?.address?.line1;
+        if (venue?.name && (!location || location.trim() === '')) {
+          location = venue.name;
+        }
+        
+        // Generate industry label based on categories and title
+        const industryByKeyword: Record<string, string> = {
+          'tech': 'Technology',
+          'technology': 'Technology',
+          'business': 'Business',
+          'finance': 'Finance',
+          'marketing': 'Marketing',
+          'education': 'Education',
+          'healthcare': 'Healthcare',
+          'health': 'Healthcare',
+          'hr': 'Human Resources',
+          'human resources': 'Human Resources',
+          'design': 'Design',
+          'creative': 'Creative',
+          'engineering': 'Engineering',
+          'developer': 'Technology',
+          'leadership': 'Leadership',
+          'management': 'Management',
+          'career': 'Career Development'
+        };
+        
+        // Determine industry from title or categories
+        let industry = 'Professional Development'; // Default
+        
+        // Check title for industry keywords
+        for (const [keyword, industryLabel] of Object.entries(industryByKeyword)) {
+          if (title.includes(keyword)) {
+            industry = industryLabel;
+            break;
+          }
+        }
+        
+        // Map to standardized event format
+        return {
+          id: event.id,
+          title: event.name,
+          description: event.description || event.info || 'No description available',
+          date,
+          time,
+          venue: venue?.name,
+          location,
+          city: venue?.city?.name,
+          state: venue?.state?.name,
+          country: venue?.country?.name,
+          url: event.url,
+          type,
+          categories,
+          industry,
+          source: "ticketmaster",
+          image
+        };
+      } catch (error) {
+        console.error('[NetworkingService] Error processing event:', error);
+        
+        // Return a minimal valid event in case of processing error
+        return {
+          id: event.id || `error-${Date.now()}`,
+          title: event.name || 'Event',
+          description: 'Event details unavailable',
+          date: new Date().toISOString().split('T')[0],
+          url: event.url || '#',
+          type: 'other',
+          categories: [],
+          industry: 'Professional',
+          source: 'ticketmaster',
+        };
       }
-      
-      // Find the best image (prefer larger images)
-      let image: string | undefined;
-      if (event.images && event.images.length > 0) {
-        // Sort by size (width × height) and take the largest
-        const sortedImages = [...event.images].sort((a, b) => 
-          (b.width * b.height) - (a.width * a.height)
-        );
-        image = sortedImages[0].url;
-      }
-      
-      // Map to standardized event format
-      return {
-        id: event.id,
-        title: event.name,
-        description: event.description || event.info || 'No description available',
-        date,
-        time,
-        venue: venue?.name,
-        location: venue?.address?.line1,
-        city: venue?.city?.name,
-        state: venue?.state?.name,
-        country: venue?.country?.name,
-        url: event.url,
-        type,
-        categories,
-        source: "ticketmaster",
-        image
-      };
-    } catch (error) {
-      console.error('[NetworkingService] Error processing event:', error);
-      
-      // Return a minimal valid event in case of processing error
-      return {
-        id: event.id || `error-${Date.now()}`,
-        title: event.name || 'Event',
-        description: 'Event details unavailable',
-        date: new Date().toISOString().split('T')[0],
-        url: event.url || '#',
-        type: 'other',
-        categories: [],
-        source: 'ticketmaster',
-      };
-    }
-  });
+    });
 }
 
 /**
