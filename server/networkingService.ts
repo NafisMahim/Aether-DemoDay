@@ -12,6 +12,12 @@ const EVENTBRITE_USER_ID = process.env.EVENTBRITE_USER_ID || '2703283588001';
 const TICKETMASTER_KEY = process.env.TICKETMASTER_KEY; // Using real API key from environment
 const TICKETMASTER_SECRET = process.env.TICKETMASTER_SECRET; // Using real API secret from environment
 
+// For debugging
+console.log('[NetworkingService] Ticketmaster credentials available:', {
+  keyAvailable: !!TICKETMASTER_KEY,
+  secretAvailable: !!TICKETMASTER_SECRET
+});
+
 // Interfaces for event data
 interface EventbriteEvent {
   id: string;
@@ -283,92 +289,108 @@ export async function searchTicketmasterEvents(
   location?: string
 ): Promise<NetworkingEvent[]> {
   try {
-    // Use more general search terms to increase chance of results
-    // Simplify to just a few core terms
-    const searchTerms = ['business', 'conference', 'networking'];
-    
-    console.log(`[Ticketmaster] Using simplified search terms: ${searchTerms.join(', ')}`);
-    
-    // Create a very simple search query that's more likely to return results
-    // Use size parameter to get more results
-    let url = `https://app.ticketmaster.com/discovery/v2/events.json?size=50&sort=date,asc`;
-    
-    // Add a single keyword parameter with a broad term
-    url += '&keyword=business';
-    
-    // Add a backup classification to focus on business events
-    url += '&classificationName=meeting'; // Simpler classification
-    
-    // Add location parameter if provided
-    if (location && location !== 'Not specified') {
-      url += `&city=${encodeURIComponent(location)}`;
+    if (!TICKETMASTER_KEY) {
+      console.error('[Ticketmaster] No API key available');
+      return [];
     }
+
+    // Make the simplest possible request to just get ANY events
+    // This is to maximize chances of getting real data to display
     
-    // Create authorization headers with API key and secret
-    const headers: Record<string, string> = {};
-    if (TICKETMASTER_KEY) {
-      // Add API key as a query parameter
-      url += `&apikey=${TICKETMASTER_KEY}`;
-    }
+    // Base URL with minimal parameters
+    let url = 'https://app.ticketmaster.com/discovery/v2/events.json?';
     
-    // Add authentication headers if secret is available
-    if (TICKETMASTER_SECRET) {
-      // Some APIs require an additional Authorization header
-      headers['Authorization'] = `Bearer ${TICKETMASTER_SECRET}`;
-    }
-    
-    // Log URL without exposing the API key
-    const sanitizedUrl = TICKETMASTER_KEY ? url.replace(TICKETMASTER_KEY, '***') : url;
-    console.log(`[Ticketmaster] Attempting to fetch events with URL: ${sanitizedUrl}`);
-    
-    // Make API request to Ticketmaster
-    const response = await axios.get(url, {
-      headers,
-      validateStatus: (status) => status < 500, // Accept any status code less than 500 to handle errors gracefully
+    // Essential parameters:
+    // - size: number of results (keep it reasonable)
+    // - sort: upcoming events first
+    // - apikey: required for authentication
+    const params = new URLSearchParams({
+      size: '10',
+      sort: 'date,asc',
+      apikey: TICKETMASTER_KEY
     });
     
-    // Check for errors in the response
-    if (response.status !== 200) {
-      console.error(`[Ticketmaster] API Error: Status ${response.status}`);
+    // Create four different search strategies to try in parallel
+    const searches = [
+      // 1. Conferences and business events
+      { ...params, keyword: 'conference,business,networking' },
       
-      // Try a simpler backup search if the first one fails
+      // 2. Technology events (workshops, hackathons)
+      { ...params, keyword: 'technology,workshop,innovation' },
+      
+      // 3. Career development events
+      { ...params, keyword: 'career,development,professional' },
+      
+      // 4. Location-based search (if provided)
+      location && location !== 'Not specified' 
+        ? { ...params, city: location, radius: '50', unit: 'miles' }
+        : null
+    ].filter(Boolean);
+    
+    console.log(`[Ticketmaster] Attempting ${searches.length} parallel search strategies`);
+    
+    // Try all search strategies in parallel
+    const searchPromises = searches.map(async (searchParams, index) => {
       try {
-        console.log('[Ticketmaster] Trying simpler backup search');
-        // Make the most basic search possible
-        let backupUrl = `https://app.ticketmaster.com/discovery/v2/events.json?size=30`;
+        // Convert params to string and append to URL
+        const searchUrl = url + new URLSearchParams(searchParams as Record<string, string>).toString();
         
-        // Add API key as a query parameter
-        if (TICKETMASTER_KEY) {
-          backupUrl += `&apikey=${TICKETMASTER_KEY}`;
+        // Create a sanitized version for logging (hide API key)
+        const sanitizedUrl = searchUrl.replace(TICKETMASTER_KEY, '***');
+        console.log(`[Ticketmaster] Search strategy ${index+1}: ${sanitizedUrl}`);
+        
+        // Make the request
+        const response = await axios.get(searchUrl, {
+          validateStatus: (status) => status < 500,
+        });
+        
+        // Process results if successful
+        if (response.status === 200 && response.data._embedded && response.data._embedded.events) {
+          console.log(`[Ticketmaster] Strategy ${index+1} successful: found ${response.data._embedded.events.length} events`);
+          return processTicketmasterEvents(response.data._embedded.events);
+        } else {
+          console.log(`[Ticketmaster] Strategy ${index+1} failed or returned no events. Status: ${response.status}`);
+          return [];
         }
+      } catch (error) {
+        console.error(`[Ticketmaster] Error in search strategy ${index+1}:`, error);
+        return [];
+      }
+    });
+    
+    // Wait for all search strategies to complete
+    const results = await Promise.all(searchPromises);
+    
+    // Combine and deduplicate results
+    const allEvents = results.flat();
+    const uniqueEvents = allEvents.filter((event, index, self) => 
+      index === self.findIndex(e => e.id === event.id)
+    );
+    
+    console.log(`[Ticketmaster] Total events found: ${uniqueEvents.length}`);
+    
+    // If we still have no results, try one final simple search with minimal parameters
+    if (uniqueEvents.length === 0) {
+      try {
+        console.log('[Ticketmaster] Trying final fallback search');
+        const fallbackUrl = `https://app.ticketmaster.com/discovery/v2/events.json?size=10&apikey=${TICKETMASTER_KEY}`;
+        const sanitizedFallbackUrl = fallbackUrl.replace(TICKETMASTER_KEY, '***');
+        console.log(`[Ticketmaster] Fallback URL: ${sanitizedFallbackUrl}`);
         
-        // Sanitize URL for logging
-        const sanitizedBackupUrl = TICKETMASTER_KEY ? backupUrl.replace(TICKETMASTER_KEY, '***') : backupUrl;
-        console.log(`[Ticketmaster] Backup search URL: ${sanitizedBackupUrl}`);
-        
-        const backupResponse = await axios.get(backupUrl, {
-          headers, // Use the same headers with auth
+        const fallbackResponse = await axios.get(fallbackUrl, {
           validateStatus: (status) => status < 500
         });
         
-        if (backupResponse.status === 200 && backupResponse.data._embedded && backupResponse.data._embedded.events) {
-          console.log(`[Ticketmaster] Backup search successful, found ${backupResponse.data._embedded.events.length} events`);
-          return processTicketmasterEvents(backupResponse.data._embedded.events);
+        if (fallbackResponse.status === 200 && fallbackResponse.data._embedded && fallbackResponse.data._embedded.events) {
+          console.log(`[Ticketmaster] Final fallback successful, found ${fallbackResponse.data._embedded.events.length} events`);
+          return processTicketmasterEvents(fallbackResponse.data._embedded.events);
         }
-      } catch (backupError) {
-        console.error('[Ticketmaster] Backup search failed:', backupError);
+      } catch (fallbackError) {
+        console.error('[Ticketmaster] Final fallback search failed:', fallbackError);
       }
-      
-      return [];
     }
     
-    // Map Ticketmaster events to standardized format
-    if (response.data && response.data._embedded && response.data._embedded.events) {
-      console.log(`[Ticketmaster] Successfully fetched ${response.data._embedded.events.length} events`);
-      return processTicketmasterEvents(response.data._embedded.events);
-    }
-    
-    return [];
+    return uniqueEvents;
   } catch (error) {
     console.error('Error fetching Ticketmaster events:', error);
     return [];
