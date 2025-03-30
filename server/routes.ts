@@ -9,6 +9,7 @@ import MemoryStore from "memorystore";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { findInternships, generateInternshipRecommendations } from "./internshipService";
 import { getNetworkingEvents } from "./networkingService";
+import networkingTestRoutes from "./networkingTestRoutes";
 
 // Initialize Gemini AI
 const geminiApiKey = process.env.GEMINI_API_KEY;
@@ -1553,6 +1554,9 @@ Now, please respond to this user message: ${message}`;
     }
   });
 
+  // Register test routes for networking APIs
+  app.use('/api/networking/test', networkingTestRoutes);
+  
   const httpServer = createServer(app);
 
   return httpServer;
