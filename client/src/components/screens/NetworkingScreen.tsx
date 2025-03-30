@@ -53,6 +53,7 @@ interface NetworkingOpportunity {
   location?: string
   date?: string
   image?: string
+  source?: "eventbrite" | "ticketmaster" | "meraki" | "generated"
 }
 
 // Types for resume sections
@@ -277,7 +278,8 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
           tags: event.categories || [],
           location: [event.venue, event.city, event.state].filter(Boolean).join(', '),
           date: formattedDate,
-          image: event.image
+          image: event.image,
+          source: event.source
         } as NetworkingOpportunity;
       }).sort((a, b) => b.relevanceScore - a.relevanceScore);
     }
@@ -294,7 +296,8 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
         industry: "Technology",
         tags: ["Technology", "Innovation", "Networking"],
         location: "San Francisco, CA",
-        date: "Apr 15, 2025"
+        date: "Apr 15, 2025",
+        source: "generated"
       },
       {
         id: "net2",
@@ -306,7 +309,8 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
         industry: "Design",
         tags: ["Design", "Community", "Mentorship"],
         location: "Online",
-        date: "Ongoing"
+        date: "Ongoing",
+        source: "generated"
       },
       {
         id: "net3",
@@ -318,7 +322,8 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
         industry: "Product",
         tags: ["Product Management", "Leadership", "Career Development"],
         location: "Boston, MA",
-        date: "May 20, 2025"
+        date: "May 20, 2025",
+        source: "generated"
       },
       {
         id: "net4",
@@ -330,7 +335,8 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
         industry: "Creative",
         tags: ["Creative", "Mentorship", "Career Development"],
         location: "New York, NY",
-        date: "Applications open May 1, 2025"
+        date: "Applications open May 1, 2025",
+        source: "generated"
       },
       {
         id: "net5",
@@ -342,7 +348,8 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
         industry: "Cross-industry",
         tags: ["Leadership", "Networking", "Professional Development"],
         location: "Chicago, IL",
-        date: "Ongoing"
+        date: "Ongoing",
+        source: "generated"
       }
     ];
   }, [networkingData])

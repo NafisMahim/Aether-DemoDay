@@ -218,8 +218,8 @@ export async function searchEventbriteEvents(
     params.append('start_date.range_start', today);
     
     // Build the URL with search parameters
-    // Ensure we're using a supported endpoint that exists
-    const searchUrl = `https://www.eventbriteapi.com/v3/events/search/?${params.toString()}`;
+    // Updated endpoint based on latest API structure
+    const searchUrl = `https://www.eventbriteapi.com/v3/organizations/${EVENTBRITE_USER_ID}/events/?${params.toString()}`;
     console.log(`[Eventbrite] Searching with URL: ${searchUrl}`);
     
     // Make the API request with detailed headers
@@ -269,7 +269,7 @@ export async function searchEventbriteEvents(
         const today = new Date().toISOString().split('T')[0];
         simplifiedParams.append('start_date.range_start', today);
         
-        const fallbackUrl = `https://www.eventbriteapi.com/v3/events/search/?${simplifiedParams.toString()}`;
+        const fallbackUrl = `https://www.eventbriteapi.com/v3/organizations/${EVENTBRITE_USER_ID}/events/?${simplifiedParams.toString()}`;
         console.log(`[Eventbrite] Fallback URL: ${fallbackUrl}`);
         
         const fallbackResponse = await axios.get(fallbackUrl, {
