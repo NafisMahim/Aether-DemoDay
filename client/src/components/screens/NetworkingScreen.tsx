@@ -639,9 +639,9 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
                 )}
               </div>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4">
                 {filteredOpportunities.map((opportunity) => (
-                  <Card key={opportunity.id} className="overflow-hidden flex flex-col h-full">
+                  <Card key={opportunity.id} className="overflow-hidden flex flex-col">
                     <CardHeader className="pb-2">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-2">
@@ -658,15 +658,15 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
                       )}
                     </CardHeader>
                     
-                    <CardContent className="pb-2 flex-grow">
-                      <div className="text-sm text-muted-foreground mb-3 line-clamp-3">
+                    <CardContent className="pb-2">
+                      <div className="text-sm text-muted-foreground mb-3">
                         {opportunity.description}
                       </div>
                       
                       {opportunity.location && (
                         <div className="flex items-center gap-1 text-xs text-muted-foreground mb-3">
                           <Building className="h-3 w-3 flex-shrink-0" />
-                          <span className="line-clamp-1">{opportunity.location}</span>
+                          <span>{opportunity.location}</span>
                         </div>
                       )}
                       
@@ -679,22 +679,22 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
                       </div>
                     </CardContent>
                     
-                    <CardFooter className="flex flex-col pt-2 gap-2">
-                      <div className="flex items-center gap-1.5 w-full">
+                    <CardFooter className="flex items-center justify-between pt-2 gap-2">
+                      <div className="flex items-center gap-1.5">
                         <span className="text-xs font-medium">
                           {opportunity.relevanceScore}% Relevant
                         </span>
                         <Progress 
                           value={opportunity.relevanceScore} 
-                          className="h-1.5 flex-grow" 
+                          className="h-1.5 w-24" 
                         />
                       </div>
                       
-                      <div className="flex w-full gap-2">
+                      <div className="flex gap-2">
                         <Button 
                           variant="default" 
                           size="sm" 
-                          className="text-xs h-8 gap-1 flex-grow"
+                          className="text-xs h-8 gap-1"
                           asChild
                         >
                           <a href={opportunity.url} target="_blank" rel="noopener noreferrer">
@@ -751,7 +751,7 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
                 )}
               </div>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4">
                 {filteredCards.map((card) => (
                   <Card key={card.id}>
                     <CardHeader className="pb-2">
