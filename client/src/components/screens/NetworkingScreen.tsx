@@ -1,59 +1,32 @@
 import { useState, useMemo } from "react"
-import { Button } from "@/components/ui/button"
+import { 
+  FileText, Share2, Download, Clock, Search, Calendar, Users, Briefcase, 
+  Plus, Edit, Trash, CheckCircle2, ExternalLink, DownloadCloud, ArrowRight,
+  Building, Mail, Phone, Globe, Linkedin, User, Info 
+} from "lucide-react"
+
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Calendar, Users, PlusCircle, Briefcase, MapPin, PhoneCall, Mail, Linkedin, Check, X, Search, Clock, Filter, Info, CheckCircle2, Star, Calendar as CalendarIcon, Plus } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { useToast } from "@/hooks/use-toast"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Separator } from "@/components/ui/separator"
+import { Progress } from "@/components/ui/progress"
+import { useToast } from "@/hooks/use-toast"
 
 interface NetworkingScreenProps {
   handleBack: (data?: any) => void
   quizResults: any
 }
 
-interface Connection {
-  id: string
-  name: string
-  title: string
-  company: string
-  avatarUrl?: string
-  lastContact?: string
-  tags: string[]
-  isSuggested?: boolean
-}
-
-interface Event {
-  id: string
-  title: string
-  date: string
-  location: string
-  description: string
-  type: "conference" | "workshop" | "meetup" | "webinar"
-  url?: string
-}
-
+// Types for business cards
 interface BusinessCard {
+  id: string
   name: string
   title: string
   company: string
@@ -65,36 +38,47 @@ interface BusinessCard {
   tagline?: string
 }
 
+// Types for AI networking opportunities
+interface NetworkingOpportunity {
+  id: string
+  title: string
+  type: "conference" | "community" | "program" | "mentorship" | "organization"
+  description: string
+  relevanceScore: number
+  url?: string
+  industry: string
+  tags: string[]
+  location?: string
+  date?: string
+}
+
+// Types for resume sections
+interface ResumeSection {
+  id: string
+  type: "experience" | "education" | "skills" | "projects" | "certifications"
+  title: string
+  organization?: string
+  date?: string
+  description: string
+  bullets?: string[]
+}
+
 export default function NetworkingScreen({ handleBack, quizResults }: NetworkingScreenProps) {
   const { toast } = useToast()
-  const [activeTab, setActiveTab] = useState("connections")
+  const [activeTab, setActiveTab] = useState("networking")
   const [searchQuery, setSearchQuery] = useState("")
+  
+  // Dialog states
   const [showAddCardDialog, setShowAddCardDialog] = useState(false)
-  const [showEventDialog, setShowEventDialog] = useState(false)
-  const [selectedConnection, setSelectedConnection] = useState<Connection | null>(null)
+  const [showAddResumeDialog, setShowAddResumeDialog] = useState(false)
+  const [showShareCardDialog, setShowShareCardDialog] = useState<string | null>(null)
+  const [resumeSectionType, setResumeSectionType] = useState<string>("experience")
+  const [selectedResumeSection, setSelectedResumeSection] = useState<ResumeSection | null>(null)
   
-  // New card form state
-  const [newCard, setNewCard] = useState<BusinessCard>({
-    name: "",
-    title: "",
-    company: "",
-    email: "",
-    phone: "",
-    tagline: "",
-  })
-  
-  // New event form state
-  const [newEvent, setNewEvent] = useState<Omit<Event, "id">>({
-    title: "",
-    date: "",
-    location: "",
-    description: "",
-    type: "meetup"
-  })
-  
-  // Sample business cards
+  // Business card state
   const [myCards, setMyCards] = useState<BusinessCard[]>([
     {
+      id: "card1",
       name: "Jordan Chen",
       title: "Product Designer",
       company: "Aether",
@@ -106,39 +90,78 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
     }
   ])
   
-  // Sample connections data
-  const [connections, setConnections] = useState<Connection[]>([
+  // New business card form state
+  const [newCard, setNewCard] = useState<Omit<BusinessCard, "id">>({
+    name: "",
+    title: "",
+    company: "",
+    email: "",
+    phone: "",
+    website: "",
+    linkedin: "",
+    tagline: ""
+  })
+  
+  // Resume sections state
+  const [resumeSections, setResumeSections] = useState<ResumeSection[]>([
     {
-      id: "1",
-      name: "Alex Morgan",
-      title: "Frontend Developer",
-      company: "TechSolutions",
-      avatarUrl: "",
-      lastContact: "2 weeks ago",
-      tags: ["Technology", "Web Development"]
+      id: "exp1",
+      type: "experience",
+      title: "UX Designer",
+      organization: "Creative Solutions Inc.",
+      date: "2023 - Present",
+      description: "Leading design initiatives for mobile applications and web platforms.",
+      bullets: [
+        "Increased user engagement by 45% through redesigned onboarding flow",
+        "Collaborated with cross-functional teams to implement new features",
+        "Conducted user research and usability testing to inform design decisions"
+      ]
     },
     {
-      id: "2",
-      name: "Jamie Williams",
-      title: "UX Designer",
-      company: "DesignHub",
-      avatarUrl: "",
-      lastContact: "1 month ago",
-      tags: ["Design", "UX Research"]
+      id: "edu1",
+      type: "education",
+      title: "Bachelor of Science in Computer Science",
+      organization: "University of Technology",
+      date: "2019 - 2023",
+      description: "Graduated with honors, specializing in Human-Computer Interaction.",
+      bullets: [
+        "Senior thesis: AI-powered interfaces for accessibility",
+        "President of Design Club",
+        "Dean's List all semesters"
+      ]
+    },
+    {
+      id: "skills1",
+      type: "skills",
+      title: "Technical Skills",
+      description: "Design and development expertise",
+      bullets: [
+        "UI/UX Design: Figma, Adobe XD, Sketch",
+        "Programming: HTML, CSS, JavaScript, React",
+        "Tools: Jira, Notion, GitHub",
+        "Soft Skills: Communication, Leadership, Problem-solving"
+      ]
     }
   ])
   
-  // Generate AI suggested connections based on quiz results
-  const suggestedConnections = useMemo(() => {
-    // If no quiz results, still provide suggestions but with generic tags
-    const hasQuizResults = quizResults && 
-      (quizResults.personalityType || quizResults.primaryType)
-    
-    // Based on personality type and career interests, generate relevant suggestions
-    // Ensure personality type is a string
+  // New resume section state
+  const [newResumeSection, setNewResumeSection] = useState<Omit<ResumeSection, "id">>({
+    type: "experience",
+    title: "",
+    organization: "",
+    date: "",
+    description: "",
+    bullets: ["", "", ""]
+  })
+  
+  // Extract career interests from quiz results for AI suggestions
+  const careerProfile = useMemo(() => {
+    // Extract personality type with enhanced handling of different formats
     let personalityType = "Professional"
+    let careerInterests: string[] = []
     
-    if (hasQuizResults) {
+    if (quizResults) {
+      // Handle different formats of personality types
       if (quizResults.personalityType) {
         personalityType = String(quizResults.personalityType)
       } else if (quizResults.primaryType) {
@@ -146,145 +169,199 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
           personalityType = quizResults.primaryType
         } else if (quizResults.primaryType && quizResults.primaryType.name) {
           personalityType = quizResults.primaryType.name
+          
+          // Get careers if available
+          if (quizResults.primaryType.careers && Array.isArray(quizResults.primaryType.careers)) {
+            careerInterests = [...careerInterests, ...quizResults.primaryType.careers]
+          }
         }
       } else if (quizResults.dominantType) {
         personalityType = String(quizResults.dominantType)
       }
+      
+      // Extract more career interests from different quiz result formats
+      if (quizResults.careerInterests) {
+        if (Array.isArray(quizResults.careerInterests)) {
+          careerInterests = [...careerInterests, ...quizResults.careerInterests]
+        }
+      }
+      
+      if (quizResults.hybridCareers && Array.isArray(quizResults.hybridCareers)) {
+        careerInterests = [...careerInterests, ...quizResults.hybridCareers]
+      }
+      
+      if (quizResults.strengths && Array.isArray(quizResults.strengths)) {
+        careerInterests = [...careerInterests, ...quizResults.strengths]
+      }
     }
     
-    const strengths = hasQuizResults && quizResults.strengths 
-      ? Array.isArray(quizResults.strengths) 
-        ? quizResults.strengths 
-        : ["Communication", "Leadership"] 
-      : ["Communication", "Leadership"]
-      
-    const careerInterests = hasQuizResults && quizResults.careerInterests 
-      ? Array.isArray(quizResults.careerInterests)
-        ? quizResults.careerInterests
-        : ["Technology", "Business"]
-      : ["Technology", "Business"]
+    // Ensure some default career interests if none found
+    if (careerInterests.length === 0) {
+      careerInterests = ["Technology", "Design", "Business"]
+    }
     
-    // Generate titles and companies based on strengths and career interests
-    const suggestions: Connection[] = [
+    // Deduplicate
+    careerInterests = Array.from(new Set(careerInterests))
+    
+    return { personalityType, careerInterests }
+  }, [quizResults])
+  
+  // AI-generated networking opportunities based on career interests
+  const networkingOpportunities = useMemo(() => {
+    const { personalityType, careerInterests } = careerProfile
+    
+    // Generate personalized networking opportunities based on career interests
+    const baseOpportunities: NetworkingOpportunity[] = [
       {
-        id: "s1",
-        name: "Taylor Reed",
-        title: personalityType.toLowerCase().indexOf("creative") >= 0 ? "Creative Director" : "Senior Developer",
-        company: "InnovateX",
-        avatarUrl: "",
-        tags: [personalityType, ...strengths.slice(0, 1)],
-        isSuggested: true
+        id: "net1",
+        title: "Tech Innovators Meetup",
+        type: "conference",
+        description: "Monthly gathering of tech professionals discussing emerging technologies and industry trends.",
+        url: "https://meetup.com/tech-innovators",
+        relevanceScore: 92,
+        industry: "Technology",
+        tags: ["Technology", "Innovation", "Networking"]
       },
       {
-        id: "s2",
-        name: "Morgan Kim",
-        title: personalityType.toLowerCase().indexOf("analytical") >= 0 ? "Data Scientist" : "Product Manager",
-        company: "FutureTech",
-        avatarUrl: "",
-        tags: careerInterests.slice(0, 2),
-        isSuggested: true
+        id: "net2",
+        title: "Women in Design Community",
+        type: "community",
+        description: "Supportive community for women in design to share resources, mentorship, and job opportunities.",
+        url: "https://discord.gg/women-in-design",
+        relevanceScore: 85,
+        industry: "Design",
+        tags: ["Design", "Community", "Mentorship"]
       },
       {
-        id: "s3",
-        name: "Riley Johnson",
-        title: personalityType.toLowerCase().indexOf("practical") >= 0 ? "Operations Manager" : "Marketing Strategist",
-        company: "GrowthSolutions",
-        avatarUrl: "",
-        tags: strengths.slice(0, 2),
-        isSuggested: true
+        id: "net3",
+        title: "Product Management Fellowship",
+        type: "program",
+        description: "Six-month fellowship connecting early-career product managers with industry mentors and resources.",
+        url: "https://productfellowship.org",
+        relevanceScore: 78,
+        industry: "Product",
+        tags: ["Product Management", "Leadership", "Career Development"]
+      },
+      {
+        id: "net4",
+        title: "Creative Industries Mentorship",
+        type: "mentorship",
+        description: "Structured mentorship program pairing creative professionals with industry leaders.",
+        url: "https://creativementorship.org",
+        relevanceScore: 89,
+        industry: "Creative",
+        tags: ["Creative", "Mentorship", "Career Development"],
+        date: "Applications open May 1, 2025"
+      },
+      {
+        id: "net5",
+        title: "Young Leaders Network",
+        type: "organization",
+        description: "Organization for early-career professionals focused on leadership development and networking.",
+        url: "https://youngleadersnetwork.org",
+        relevanceScore: 75,
+        industry: "Cross-industry",
+        tags: ["Leadership", "Networking", "Professional Development"]
       }
     ]
     
-    return suggestions
-  }, [quizResults])
-  
-  // Sample events data
-  const [events, setEvents] = useState<Event[]>([
-    {
-      id: "e1",
-      title: "Tech Innovation Summit",
-      date: "2025-04-15",
-      location: "San Francisco Convention Center",
-      description: "Connect with industry leaders and discover cutting-edge technologies shaping the future of digital experiences.",
-      type: "conference"
-    },
-    {
-      id: "e2",
-      title: "UX Design Workshop",
-      date: "2025-04-22",
-      location: "Virtual Event",
-      description: "Hands-on workshop on designing intuitive user experiences with industry experts.",
-      type: "workshop",
-      url: "https://example.com/ux-workshop"
-    }
-  ])
-  
-  // Filter connections based on search query
-  const filteredConnections = useMemo(() => {
-    if (!searchQuery) return connections
-    
-    const query = searchQuery.toLowerCase()
-    return connections.filter(
-      connection => 
-        connection.name.toLowerCase().includes(query) ||
-        connection.title.toLowerCase().includes(query) ||
-        connection.company.toLowerCase().includes(query) ||
-        connection.tags.some(tag => tag.toLowerCase().includes(query))
-    )
-  }, [connections, searchQuery])
-  
-  // Filter events based on search query
-  const filteredEvents = useMemo(() => {
-    if (!searchQuery) return events
-    
-    const query = searchQuery.toLowerCase()
-    return events.filter(
-      event => 
-        event.title.toLowerCase().includes(query) ||
-        event.location.toLowerCase().includes(query) ||
-        event.description.toLowerCase().includes(query) ||
-        event.type.toLowerCase().includes(query)
-    )
-  }, [events, searchQuery])
-  
-  const handleAddConnection = (connection: Connection) => {
-    // Check if connection already exists
-    const exists = connections.some(conn => conn.id === connection.id)
-    
-    if (!exists) {
-      // Add to connections list (remove suggested flag)
-      const newConnection = { ...connection, isSuggested: false }
-      setConnections([...connections, newConnection])
-      
-      toast({
-        title: "Connection added",
-        description: `${connection.name} has been added to your network.`
+    // Sort opportunities based on relevance to career interests
+    const personalizedOpportunities = baseOpportunities
+      .map(opportunity => {
+        // Calculate a personalized relevance score based on career interest matches
+        const interestMatches = careerInterests.filter(interest => 
+          opportunity.tags.some(tag => 
+            tag.toLowerCase().includes(interest.toLowerCase()) ||
+            interest.toLowerCase().includes(tag.toLowerCase())
+          )
+        ).length
+        
+        // Adjust relevance score based on matches
+        const adjustedScore = opportunity.relevanceScore + 
+          (interestMatches > 0 ? (interestMatches * 5) : -10)
+        
+        return {
+          ...opportunity,
+          relevanceScore: Math.min(100, Math.max(50, adjustedScore))
+        }
       })
-    }
-  }
-  
-  const handleRemoveConnection = (id: string) => {
-    setConnections(connections.filter(conn => conn.id !== id))
+      .sort((a, b) => b.relevanceScore - a.relevanceScore)
     
-    toast({
-      title: "Connection removed",
-      description: "Contact has been removed from your network."
-    })
-  }
+    return personalizedOpportunities
+  }, [careerProfile])
   
+  // Filtered networking opportunities based on search
+  const filteredOpportunities = useMemo(() => {
+    if (!searchQuery) return networkingOpportunities
+    
+    const query = searchQuery.toLowerCase()
+    return networkingOpportunities.filter(
+      opportunity => 
+        opportunity.title.toLowerCase().includes(query) ||
+        opportunity.description.toLowerCase().includes(query) ||
+        opportunity.industry.toLowerCase().includes(query) ||
+        opportunity.tags.some(tag => tag.toLowerCase().includes(query))
+    )
+  }, [networkingOpportunities, searchQuery])
+  
+  // Filtered business cards based on search
+  const filteredCards = useMemo(() => {
+    if (!searchQuery) return myCards
+    
+    const query = searchQuery.toLowerCase()
+    return myCards.filter(
+      card => 
+        card.name.toLowerCase().includes(query) ||
+        card.title.toLowerCase().includes(query) ||
+        card.company.toLowerCase().includes(query) ||
+        (card.tagline && card.tagline.toLowerCase().includes(query))
+    )
+  }, [myCards, searchQuery])
+  
+  // Filtered resume sections based on search and type
+  const filteredResumeSections = useMemo(() => {
+    const sections = searchQuery 
+      ? resumeSections.filter(
+          section => 
+            section.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (section.organization && section.organization.toLowerCase().includes(searchQuery.toLowerCase())) ||
+            section.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (section.bullets && section.bullets.some(bullet => bullet.toLowerCase().includes(searchQuery.toLowerCase())))
+        )
+      : resumeSections
+    
+    // Group by type
+    const groupedSections = sections.reduce((acc, section) => {
+      if (!acc[section.type]) {
+        acc[section.type] = []
+      }
+      acc[section.type].push(section)
+      return acc
+    }, {} as Record<string, ResumeSection[]>)
+    
+    return groupedSections
+  }, [resumeSections, searchQuery])
+  
+  // Handle adding a new business card
   const handleAddCard = () => {
     // Validation
     if (!newCard.name || !newCard.title || !newCard.company || !newCard.email) {
       toast({
         title: "Required fields missing",
-        description: "Please fill in all required fields.",
+        description: "Please fill in all required fields: Name, Title, Company, and Email.",
         variant: "destructive"
       })
       return
     }
     
+    // Create new card with ID
+    const cardWithId: BusinessCard = {
+      ...newCard,
+      id: `card${Date.now()}`
+    }
+    
     // Add to cards collection
-    setMyCards([...myCards, newCard])
+    setMyCards([...myCards, cardWithId])
     
     // Reset form
     setNewCard({
@@ -293,6 +370,8 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
       company: "",
       email: "",
       phone: "",
+      website: "",
+      linkedin: "",
       tagline: ""
     })
     
@@ -305,9 +384,10 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
     })
   }
   
-  const handleAddEvent = () => {
+  // Handle adding a new resume section
+  const handleAddResumeSection = () => {
     // Validation
-    if (!newEvent.title || !newEvent.date || !newEvent.location || !newEvent.type) {
+    if (!newResumeSection.title || (newResumeSection.type !== 'skills' && !newResumeSection.organization)) {
       toast({
         title: "Required fields missing",
         description: "Please fill in all required fields.",
@@ -316,37 +396,115 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
       return
     }
     
-    // Add to events collection
-    const eventWithId: Event = {
-      ...newEvent,
-      id: `e${events.length + 1}`
+    // Filter out empty bullets
+    const bullets = newResumeSection.bullets?.filter(bullet => bullet.trim() !== '') || []
+    
+    // Create new section with ID
+    const sectionWithId: ResumeSection = {
+      ...newResumeSection,
+      bullets,
+      id: `${newResumeSection.type}${Date.now()}`
     }
     
-    setEvents([...events, eventWithId])
+    // Add to resume sections
+    setResumeSections([...resumeSections, sectionWithId])
     
     // Reset form
-    setNewEvent({
+    setNewResumeSection({
+      type: resumeSectionType,
       title: "",
+      organization: "",
       date: "",
-      location: "",
       description: "",
-      type: "meetup"
+      bullets: ["", "", ""]
     })
     
     // Close dialog
-    setShowEventDialog(false)
+    setShowAddResumeDialog(false)
     
     toast({
-      title: "Event added",
-      description: "New event has been added to your calendar."
+      title: "Resume section added",
+      description: `New ${resumeSectionType} section has been added to your resume.`
     })
   }
   
-  // Calculate how many suggested connections match current connections
-  const getMatchPercentage = (connection: Connection) => {
-    const existingTags = connections.flatMap(conn => conn.tags)
-    const matchingTags = connection.tags.filter(tag => existingTags.includes(tag))
-    return Math.min(100, Math.round((matchingTags.length / connection.tags.length) * 100))
+  // Handle editing a resume section
+  const handleEditResumeSection = () => {
+    if (!selectedResumeSection) return
+    
+    // Validation
+    if (!selectedResumeSection.title || (selectedResumeSection.type !== 'skills' && !selectedResumeSection.organization)) {
+      toast({
+        title: "Required fields missing",
+        description: "Please fill in all required fields.",
+        variant: "destructive"
+      })
+      return
+    }
+    
+    // Filter out empty bullets
+    const bullets = selectedResumeSection.bullets?.filter(bullet => bullet.trim() !== '') || []
+    
+    // Update section
+    const updatedSections = resumeSections.map(section => 
+      section.id === selectedResumeSection.id 
+        ? { ...selectedResumeSection, bullets } 
+        : section
+    )
+    
+    setResumeSections(updatedSections)
+    
+    // Reset state
+    setSelectedResumeSection(null)
+    
+    toast({
+      title: "Resume section updated",
+      description: `Your ${selectedResumeSection.type} section has been updated.`
+    })
+  }
+  
+  // Handle deleting a resume section
+  const handleDeleteResumeSection = (id: string) => {
+    setResumeSections(resumeSections.filter(section => section.id !== id))
+    
+    toast({
+      title: "Resume section deleted",
+      description: "The section has been removed from your resume."
+    })
+  }
+  
+  // Handle deleting a business card
+  const handleDeleteCard = (id: string) => {
+    setMyCards(myCards.filter(card => card.id !== id))
+    
+    toast({
+      title: "Business card deleted",
+      description: "The business card has been deleted."
+    })
+  }
+  
+  // Helper to get icon based on opportunity type
+  const getOpportunityIcon = (type: string) => {
+    switch (type) {
+      case 'conference': return <Users className="h-5 w-5" />
+      case 'community': return <Users className="h-5 w-5" />
+      case 'program': return <FileText className="h-5 w-5" />
+      case 'mentorship': return <User className="h-5 w-5" />
+      case 'organization': return <Building className="h-5 w-5" />
+      default: return <Users className="h-5 w-5" />
+    }
+  }
+  
+  // Helper to get icon based on resume section type
+  const getResumeSectionIcon = (type: string) => {
+    switch (type) {
+      case 'experience': return <Briefcase className="h-5 w-5" />
+      case 'education': return <Globe className="h-5 w-5" />
+      case 'skills': return <CheckCircle2 className="h-5 w-5" />
+      case 'projects': return <FileText className="h-5 w-5" />
+      case 'certifications': return <Download className="h-5 w-5" />
+      default: return <FileText className="h-5 w-5" />
+    }
   }
   
   return (
@@ -370,7 +528,7 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input
               className="pl-10 w-full"
-              placeholder="Search connections, events..."
+              placeholder="Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -379,172 +537,33 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3 mb-4">
-            <TabsTrigger value="connections" className="flex items-center gap-1">
+            <TabsTrigger value="networking" className="flex items-center gap-1">
               <Users className="h-4 w-4" />
-              <span>Connections</span>
-            </TabsTrigger>
-            <TabsTrigger value="events" className="flex items-center gap-1">
-              <Calendar className="h-4 w-4" />
-              <span>Events</span>
+              <span>Networking</span>
             </TabsTrigger>
             <TabsTrigger value="cards" className="flex items-center gap-1">
               <Briefcase className="h-4 w-4" />
-              <span>My Cards</span>
+              <span>Business Cards</span>
+            </TabsTrigger>
+            <TabsTrigger value="resume" className="flex items-center gap-1">
+              <FileText className="h-4 w-4" />
+              <span>Resume Builder</span>
             </TabsTrigger>
           </TabsList>
           
-          {/* Connections Tab */}
-          <TabsContent value="connections" className="space-y-4">
-            {/* AI Suggestions Section */}
-            {suggestedConnections.length > 0 && (
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-2">
-                  <h2 className="text-lg font-semibold text-primary">Recommended Connections</h2>
-                  <Info className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <p className="text-xs text-muted-foreground mb-3">
-                  Based on your career assessment and interests
-                </p>
-                <div className="space-y-3">
-                  {suggestedConnections.map((connection) => (
-                    <Card key={connection.id} className="relative overflow-hidden">
-                      <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-blue-500/10 to-transparent"></div>
-                      <CardContent className="p-4">
-                        <div className="flex justify-between items-start">
-                          <div className="flex items-start space-x-3">
-                            <Avatar className="h-10 w-10">
-                              <AvatarImage src={connection.avatarUrl} />
-                              <AvatarFallback>{connection.name.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <h3 className="font-medium">{connection.name}</h3>
-                              <p className="text-sm text-muted-foreground">{connection.title} at {connection.company}</p>
-                              <div className="flex gap-1 mt-1 flex-wrap">
-                                {connection.tags.map((tag, i) => (
-                                  <Badge key={i} variant="outline" className="text-xs px-1">{tag}</Badge>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="inline-flex items-center px-2 py-1 bg-blue-50 text-blue-700 rounded-full text-xs">
-                              <CheckCircle2 className="h-3 w-3 mr-1" />
-                              {getMatchPercentage(connection)}% Match
-                            </div>
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              className="mt-2 text-xs"
-                              onClick={() => handleAddConnection(connection)}
-                            >
-                              <PlusCircle className="h-3 w-3 mr-1" />
-                              Connect
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {/* My Connections */}
-            <div>
-              <h2 className="text-lg font-semibold mb-2">My Network</h2>
-              {filteredConnections.length === 0 ? (
-                <div className="flex flex-col items-center justify-center p-6 text-center border border-dashed rounded-lg">
-                  <Users className="h-8 w-8 text-muted-foreground mb-2" />
-                  <p className="text-muted-foreground">No connections found</p>
-                  {searchQuery && (
-                    <Button 
-                      variant="link" 
-                      className="mt-1 h-auto p-0"
-                      onClick={() => setSearchQuery("")}
-                    >
-                      Clear search
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {filteredConnections.map((connection) => (
-                    <Card key={connection.id} className="overflow-hidden">
-                      <CardContent className="p-4">
-                        <div className="flex justify-between items-start">
-                          <div className="flex items-start space-x-3">
-                            <Avatar className="h-10 w-10">
-                              <AvatarImage src={connection.avatarUrl} />
-                              <AvatarFallback>{connection.name.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <h3 className="font-medium">{connection.name}</h3>
-                              <p className="text-sm text-muted-foreground">{connection.title} at {connection.company}</p>
-                              <div className="flex gap-1 mt-1 flex-wrap">
-                                {connection.tags.map((tag, i) => (
-                                  <Badge key={i} variant="outline" className="text-xs px-1">{tag}</Badge>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                <span className="sr-only">Open menu</span>
-                                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4">
-                                  <path d="M3.625 7.5C3.625 8.12132 3.12132 8.625 2.5 8.625C1.87868 8.625 1.375 8.12132 1.375 7.5C1.375 6.87868 1.87868 6.375 2.5 6.375C3.12132 6.375 3.625 6.87868 3.625 7.5ZM8.625 7.5C8.625 8.12132 8.12132 8.625 7.5 8.625C6.87868 8.625 6.375 8.12132 6.375 7.5C6.375 6.87868 6.87868 6.375 7.5 6.375C8.12132 6.375 8.625 6.87868 8.625 7.5ZM13.625 7.5C13.625 8.12132 13.1213 8.625 12.5 8.625C11.8787 8.625 11.375 8.12132 11.375 7.5C11.375 6.87868 11.8787 6.375 12.5 6.375C13.1213 6.375 13.625 6.87868 13.625 7.5Z" fill="currentColor"></path>
-                                </svg>
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem 
-                                onClick={() => setSelectedConnection(connection)}
-                              >
-                                View details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>Send message</DropdownMenuItem>
-                              <DropdownMenuItem>Add note</DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                className="text-red-600"
-                                onClick={() => handleRemoveConnection(connection.id)}
-                              >
-                                Remove
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                        {connection.lastContact && (
-                          <div className="mt-2 flex items-center text-xs text-muted-foreground">
-                            <Clock className="h-3 w-3 mr-1" />
-                            Last contacted: {connection.lastContact}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </div>
-          </TabsContent>
-          
-          {/* Events Tab */}
-          <TabsContent value="events" className="space-y-4">
-            <div className="flex justify-between items-center mb-2">
-              <h2 className="text-lg font-semibold">Upcoming Events</h2>
-              <Button 
-                size="sm" 
-                onClick={() => setShowEventDialog(true)}
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add Event
-              </Button>
+          {/* Networking Opportunities Tab */}
+          <TabsContent value="networking" className="space-y-4">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-lg font-semibold">AI-Suggested Networking Opportunities</h2>
+              <Badge variant="outline" className="text-xs">
+                Based on your career profile
+              </Badge>
             </div>
             
-            {filteredEvents.length === 0 ? (
+            {filteredOpportunities.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-6 text-center border border-dashed rounded-lg">
-                <Calendar className="h-8 w-8 text-muted-foreground mb-2" />
-                <p className="text-muted-foreground">No events found</p>
+                <Users className="h-8 w-8 text-muted-foreground mb-2" />
+                <p className="text-muted-foreground">No networking opportunities found</p>
                 {searchQuery && (
                   <Button 
                     variant="link" 
@@ -556,41 +575,148 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
                 )}
               </div>
             ) : (
-              <div className="space-y-3">
-                {filteredEvents.map((event) => (
-                  <Card key={event.id}>
+              <div className="grid gap-4 md:grid-cols-2">
+                {filteredOpportunities.map((opportunity) => (
+                  <Card key={opportunity.id} className="overflow-hidden">
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-base">{event.title}</CardTitle>
-                      <div className="flex justify-between items-center">
-                        <Badge variant={
-                          event.type === "conference" ? "default" :
-                          event.type === "workshop" ? "secondary" :
-                          event.type === "meetup" ? "outline" : "destructive"
-                        }>
-                          {event.type.charAt(0).toUpperCase() + event.type.slice(1)}
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-2">
+                          {getOpportunityIcon(opportunity.type)}
+                          <CardTitle className="text-base">{opportunity.title}</CardTitle>
+                        </div>
+                        <Badge variant="secondary" className="text-xs">
+                          {opportunity.industry}
                         </Badge>
-                        <div className="flex items-center text-sm text-muted-foreground">
-                          <CalendarIcon className="h-3 w-3 mr-1" />
-                          {new Date(event.date).toLocaleDateString()}
+                      </div>
+                      <CardDescription className="text-xs">
+                        {opportunity.type.charAt(0).toUpperCase() + opportunity.type.slice(1)}
+                        {opportunity.date && ` • ${opportunity.date}`}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="pb-3">
+                      <p className="text-sm text-muted-foreground">{opportunity.description}</p>
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {opportunity.tags.map((tag, i) => (
+                          <Badge key={i} variant="outline" className="text-xs">{tag}</Badge>
+                        ))}
+                      </div>
+                    </CardContent>
+                    <CardFooter className="pt-0 flex justify-between">
+                      <div className="flex items-center gap-1">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+                        <span className="text-sm font-medium">{opportunity.relevanceScore}% Relevant</span>
+                      </div>
+                      <Button variant="outline" size="sm" className="h-8" asChild>
+                        <a href={opportunity.url} target="_blank" rel="noopener noreferrer">
+                          Visit <ExternalLink className="h-3.5 w-3.5 ml-1" />
+                        </a>
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            )}
+            
+            <div className="pt-4">
+              <h3 className="text-base font-medium mb-1">Need more personalized suggestions?</h3>
+              <p className="text-sm text-muted-foreground mb-3">
+                Complete more sections of your profile or take our career assessment to get better networking recommendations.
+              </p>
+              <div className="flex gap-2">
+                <Button variant="outline" className="gap-1" onClick={() => handleBack()}>
+                  <FileText className="h-4 w-4" />
+                  <span>Update Profile</span>
+                </Button>
+              </div>
+            </div>
+          </TabsContent>
+          
+          {/* Business Cards Tab */}
+          <TabsContent value="cards" className="space-y-4">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-lg font-semibold">My Business Cards</h2>
+              <Button variant="outline" size="sm" onClick={() => setShowAddCardDialog(true)}>
+                <Plus className="h-4 w-4 mr-1" />
+                New Card
+              </Button>
+            </div>
+            
+            {filteredCards.length === 0 ? (
+              <div className="flex flex-col items-center justify-center p-6 text-center border border-dashed rounded-lg">
+                <Briefcase className="h-8 w-8 text-muted-foreground mb-2" />
+                <p className="text-muted-foreground mb-2">No business cards found</p>
+                <Button onClick={() => setShowAddCardDialog(true)}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Create Business Card
+                </Button>
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {filteredCards.map((card) => (
+                  <Card key={card.id} className="overflow-hidden">
+                    <CardContent className="p-5">
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-start space-x-3">
+                          <Avatar className="h-12 w-12">
+                            <AvatarImage src={card.avatarUrl} />
+                            <AvatarFallback>{card.name.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <h3 className="font-medium">{card.name}</h3>
+                            <p className="text-sm text-muted-foreground">{card.title}</p>
+                            <p className="text-sm text-muted-foreground">{card.company}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => setShowShareCardDialog(card.id)}
+                          >
+                            <Share2 className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="h-8 w-8 p-0 text-destructive"
+                            onClick={() => handleDeleteCard(card.id)}
+                          >
+                            <Trash className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="flex items-start text-sm mb-2">
-                        <MapPin className="h-4 w-4 mr-1 mt-0.5 text-muted-foreground flex-shrink-0" />
-                        <span>{event.location}</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
-                        {event.description}
-                      </p>
-                      <div className="flex justify-end space-x-2">
-                        {event.url && (
-                          <Button size="sm" variant="outline">
-                            Register
-                          </Button>
+                      
+                      <div className="mt-3 space-y-2 text-sm">
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-4 w-4 text-muted-foreground" />
+                          <span>{card.email}</span>
+                        </div>
+                        {card.phone && (
+                          <div className="flex items-center gap-2">
+                            <Phone className="h-4 w-4 text-muted-foreground" />
+                            <span>{card.phone}</span>
+                          </div>
                         )}
-                        <Button size="sm">Add to Calendar</Button>
+                        {card.website && (
+                          <div className="flex items-center gap-2">
+                            <Globe className="h-4 w-4 text-muted-foreground" />
+                            <span>{card.website}</span>
+                          </div>
+                        )}
+                        {card.linkedin && (
+                          <div className="flex items-center gap-2">
+                            <Linkedin className="h-4 w-4 text-muted-foreground" />
+                            <span>{card.linkedin}</span>
+                          </div>
+                        )}
                       </div>
+                      
+                      {card.tagline && (
+                        <div className="mt-3 pt-3 border-t">
+                          <p className="text-sm italic">"{card.tagline}"</p>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 ))}
@@ -598,312 +724,683 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
             )}
           </TabsContent>
           
-          {/* Business Cards Tab */}
-          <TabsContent value="cards" className="space-y-4">
-            <div className="flex justify-between items-center mb-2">
-              <h2 className="text-lg font-semibold">My Business Cards</h2>
-              <Button 
-                size="sm" 
-                onClick={() => setShowAddCardDialog(true)}
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                New Card
-              </Button>
+          {/* Resume Builder Tab */}
+          <TabsContent value="resume" className="space-y-4">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-lg font-semibold">Resume Builder</h2>
+              <Dialog open={showAddResumeDialog} onOpenChange={setShowAddResumeDialog}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Section
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Resume Section</DialogTitle>
+                    <DialogDescription>
+                      Create a new section for your resume. This will be used to generate your professional resume.
+                    </DialogDescription>
+                  </DialogHeader>
+                  
+                  <div className="space-y-4 py-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="sectionType">Section Type</Label>
+                      <Select
+                        value={resumeSectionType}
+                        onValueChange={(value) => {
+                          setResumeSectionType(value)
+                          setNewResumeSection(prev => ({ ...prev, type: value as any }))
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="experience">Work Experience</SelectItem>
+                          <SelectItem value="education">Education</SelectItem>
+                          <SelectItem value="skills">Skills</SelectItem>
+                          <SelectItem value="projects">Projects</SelectItem>
+                          <SelectItem value="certifications">Certifications</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="title">Title*</Label>
+                      <Input
+                        id="title"
+                        value={newResumeSection.title}
+                        onChange={(e) => setNewResumeSection(prev => ({ ...prev, title: e.target.value }))}
+                        placeholder={
+                          resumeSectionType === "experience" ? "Job Title" :
+                          resumeSectionType === "education" ? "Degree" :
+                          resumeSectionType === "skills" ? "Skill Category" :
+                          resumeSectionType === "projects" ? "Project Name" :
+                          "Certification Name"
+                        }
+                      />
+                    </div>
+                    
+                    {resumeSectionType !== "skills" && (
+                      <div className="space-y-2">
+                        <Label htmlFor="organization">
+                          {resumeSectionType === "experience" ? "Company*" :
+                           resumeSectionType === "education" ? "Institution*" :
+                           resumeSectionType === "projects" ? "Organization" :
+                           "Issuing Organization*"}
+                        </Label>
+                        <Input
+                          id="organization"
+                          value={newResumeSection.organization || ""}
+                          onChange={(e) => setNewResumeSection(prev => ({ ...prev, organization: e.target.value }))}
+                        />
+                      </div>
+                    )}
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="date">
+                        {resumeSectionType === "experience" || resumeSectionType === "education" ? "Date Range" :
+                         resumeSectionType === "projects" ? "Completion Date" :
+                         "Issue Date"}
+                      </Label>
+                      <Input
+                        id="date"
+                        value={newResumeSection.date || ""}
+                        onChange={(e) => setNewResumeSection(prev => ({ ...prev, date: e.target.value }))}
+                        placeholder={resumeSectionType === "experience" ? "e.g., 2020 - Present" : "e.g., May 2023"}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="description">Description</Label>
+                      <Textarea
+                        id="description"
+                        value={newResumeSection.description}
+                        onChange={(e) => setNewResumeSection(prev => ({ ...prev, description: e.target.value }))}
+                        placeholder="Brief description"
+                        rows={2}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>Key Points (Bullet Points)</Label>
+                      {newResumeSection.bullets?.map((bullet, index) => (
+                        <Input
+                          key={index}
+                          value={bullet}
+                          onChange={(e) => {
+                            const newBullets = [...(newResumeSection.bullets || [])]
+                            newBullets[index] = e.target.value
+                            setNewResumeSection(prev => ({ ...prev, bullets: newBullets }))
+                          }}
+                          placeholder={`Bullet point ${index + 1}`}
+                          className="mb-2"
+                        />
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setNewResumeSection(prev => ({ 
+                          ...prev, 
+                          bullets: [...(prev.bullets || []), ""] 
+                        }))}
+                      >
+                        <Plus className="h-3.5 w-3.5 mr-1" />
+                        Add Bullet
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setShowAddResumeDialog(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleAddResumeSection}>
+                      Add to Resume
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
             
-            <div className="grid grid-cols-1 gap-4">
-              {myCards.map((card, index) => (
-                <div 
-                  key={index} 
-                  className="relative bg-white rounded-xl overflow-hidden shadow-lg p-5 border"
-                  style={{
-                    background: "linear-gradient(135deg, #fff 0%, #f8fafc 100%)"
-                  }}
-                >
-                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-600"></div>
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-blue-500/5 to-transparent"></div>
-                  
-                  <div className="flex items-start">
-                    <div className="mr-4">
-                      <Avatar className="h-16 w-16 border-2 border-white shadow-sm">
-                        <AvatarImage src={card.avatarUrl} />
-                        <AvatarFallback className="text-lg">{card.name.charAt(0)}</AvatarFallback>
-                      </Avatar>
+            {Object.keys(filteredResumeSections).length === 0 ? (
+              <div className="flex flex-col items-center justify-center p-6 text-center border border-dashed rounded-lg">
+                <FileText className="h-8 w-8 text-muted-foreground mb-2" />
+                <p className="text-muted-foreground mb-2">No resume sections found</p>
+                <Button onClick={() => setShowAddResumeDialog(true)}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add First Section
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Experience Section */}
+                {filteredResumeSections.experience && (
+                  <div className="space-y-3">
+                    <div className="flex items-center">
+                      <Briefcase className="h-5 w-5 mr-2 text-primary" />
+                      <h3 className="text-base font-semibold">Experience</h3>
                     </div>
-                    <div className="flex-1">
-                      <h3 className="font-bold text-xl">{card.name}</h3>
-                      <p className="text-gray-600 font-medium">{card.title}</p>
-                      <p className="text-gray-500">{card.company}</p>
-                      {card.tagline && (
-                        <p className="text-sm text-gray-600 italic mt-2">{card.tagline}</p>
-                      )}
+                    <div className="space-y-3">
+                      {filteredResumeSections.experience.map((section) => (
+                        <Card key={section.id} className="overflow-hidden">
+                          <CardHeader className="pb-2">
+                            <div className="flex justify-between">
+                              <div>
+                                <CardTitle className="text-base">{section.title}</CardTitle>
+                                <CardDescription>
+                                  {section.organization} {section.date && `• ${section.date}`}
+                                </CardDescription>
+                              </div>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  onClick={() => {
+                                    setSelectedResumeSection(section)
+                                    setResumeSectionType(section.type)
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 text-destructive"
+                                  onClick={() => handleDeleteResumeSection(section.id)}
+                                >
+                                  <Trash className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="pb-3">
+                            {section.description && (
+                              <p className="text-sm text-muted-foreground mb-2">{section.description}</p>
+                            )}
+                            {section.bullets && section.bullets.length > 0 && (
+                              <ul className="text-sm space-y-1 list-disc pl-5">
+                                {section.bullets.map((bullet, i) => (
+                                  <li key={i}>{bullet}</li>
+                                ))}
+                              </ul>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
                     </div>
                   </div>
-                  
-                  <div className="mt-4 space-y-1.5">
-                    <div className="flex items-center text-sm">
-                      <Mail className="h-4 w-4 mr-2 text-gray-500" />
-                      <span>{card.email}</span>
+                )}
+                
+                {/* Education Section */}
+                {filteredResumeSections.education && (
+                  <div className="space-y-3">
+                    <div className="flex items-center">
+                      <Globe className="h-5 w-5 mr-2 text-primary" />
+                      <h3 className="text-base font-semibold">Education</h3>
                     </div>
-                    {card.phone && (
-                      <div className="flex items-center text-sm">
-                        <PhoneCall className="h-4 w-4 mr-2 text-gray-500" />
-                        <span>{card.phone}</span>
+                    <div className="space-y-3">
+                      {filteredResumeSections.education.map((section) => (
+                        <Card key={section.id} className="overflow-hidden">
+                          <CardHeader className="pb-2">
+                            <div className="flex justify-between">
+                              <div>
+                                <CardTitle className="text-base">{section.title}</CardTitle>
+                                <CardDescription>
+                                  {section.organization} {section.date && `• ${section.date}`}
+                                </CardDescription>
+                              </div>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  onClick={() => {
+                                    setSelectedResumeSection(section)
+                                    setResumeSectionType(section.type)
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 text-destructive"
+                                  onClick={() => handleDeleteResumeSection(section.id)}
+                                >
+                                  <Trash className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="pb-3">
+                            {section.description && (
+                              <p className="text-sm text-muted-foreground mb-2">{section.description}</p>
+                            )}
+                            {section.bullets && section.bullets.length > 0 && (
+                              <ul className="text-sm space-y-1 list-disc pl-5">
+                                {section.bullets.map((bullet, i) => (
+                                  <li key={i}>{bullet}</li>
+                                ))}
+                              </ul>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Skills Section */}
+                {filteredResumeSections.skills && (
+                  <div className="space-y-3">
+                    <div className="flex items-center">
+                      <CheckCircle2 className="h-5 w-5 mr-2 text-primary" />
+                      <h3 className="text-base font-semibold">Skills</h3>
+                    </div>
+                    <div className="space-y-3">
+                      {filteredResumeSections.skills.map((section) => (
+                        <Card key={section.id} className="overflow-hidden">
+                          <CardHeader className="pb-2">
+                            <div className="flex justify-between">
+                              <div>
+                                <CardTitle className="text-base">{section.title}</CardTitle>
+                                {section.description && (
+                                  <CardDescription>{section.description}</CardDescription>
+                                )}
+                              </div>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  onClick={() => {
+                                    setSelectedResumeSection(section)
+                                    setResumeSectionType(section.type)
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 text-destructive"
+                                  onClick={() => handleDeleteResumeSection(section.id)}
+                                >
+                                  <Trash className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="pb-3">
+                            {section.bullets && section.bullets.length > 0 && (
+                              <div className="flex flex-wrap gap-2">
+                                {section.bullets.map((bullet, i) => (
+                                  <Badge key={i} variant="secondary">
+                                    {bullet}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Other Sections (Projects, Certifications) */}
+                {Object.entries(filteredResumeSections)
+                  .filter(([type]) => !['experience', 'education', 'skills'].includes(type))
+                  .map(([type, sections]) => (
+                    <div key={type} className="space-y-3">
+                      <div className="flex items-center">
+                        {type === 'projects' ? 
+                          <FileText className="h-5 w-5 mr-2 text-primary" /> : 
+                          <Download className="h-5 w-5 mr-2 text-primary" />}
+                        <h3 className="text-base font-semibold">
+                          {type.charAt(0).toUpperCase() + type.slice(1)}
+                        </h3>
                       </div>
-                    )}
-                    {card.linkedin && (
-                      <div className="flex items-center text-sm">
-                        <Linkedin className="h-4 w-4 mr-2 text-gray-500" />
-                        <span>{card.linkedin}</span>
+                      <div className="space-y-3">
+                        {sections.map((section) => (
+                          <Card key={section.id} className="overflow-hidden">
+                            <CardHeader className="pb-2">
+                              <div className="flex justify-between">
+                                <div>
+                                  <CardTitle className="text-base">{section.title}</CardTitle>
+                                  <CardDescription>
+                                    {section.organization && `${section.organization} `}
+                                    {section.date && `• ${section.date}`}
+                                  </CardDescription>
+                                </div>
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0"
+                                    onClick={() => {
+                                      setSelectedResumeSection(section)
+                                      setResumeSectionType(section.type)
+                                    }}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0 text-destructive"
+                                    onClick={() => handleDeleteResumeSection(section.id)}
+                                  >
+                                    <Trash className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="pb-3">
+                              {section.description && (
+                                <p className="text-sm text-muted-foreground mb-2">{section.description}</p>
+                              )}
+                              {section.bullets && section.bullets.length > 0 && (
+                                <ul className="text-sm space-y-1 list-disc pl-5">
+                                  {section.bullets.map((bullet, i) => (
+                                    <li key={i}>{bullet}</li>
+                                  ))}
+                                </ul>
+                              )}
+                            </CardContent>
+                          </Card>
+                        ))}
                       </div>
-                    )}
-                  </div>
-                  
-                  <div className="mt-4 flex justify-end">
-                    <Button size="sm" variant="secondary">
-                      Share Card
-                    </Button>
-                  </div>
+                    </div>
+                  ))}
+                
+                {/* Export Actions */}
+                <div className="flex justify-center mt-4 pt-4 border-t">
+                  <Button className="gap-1">
+                    <DownloadCloud className="h-4 w-4" />
+                    <span>Download Resume</span>
+                  </Button>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>
       
       {/* Add Business Card Dialog */}
       <Dialog open={showAddCardDialog} onOpenChange={setShowAddCardDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Create Business Card</DialogTitle>
             <DialogDescription>
-              Create a new business card to share with your network.
+              Create a professional business card to share with your network.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
-                Name*
-              </Label>
+          
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="name">Full Name*</Label>
               <Input
                 id="name"
                 value={newCard.name}
-                onChange={(e) => setNewCard({...newCard, name: e.target.value})}
-                className="col-span-3"
+                onChange={(e) => setNewCard(prev => ({ ...prev, name: e.target.value }))}
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="title" className="text-right">
-                Title*
-              </Label>
+            
+            <div className="space-y-2">
+              <Label htmlFor="title">Job Title*</Label>
               <Input
                 id="title"
                 value={newCard.title}
-                onChange={(e) => setNewCard({...newCard, title: e.target.value})}
-                className="col-span-3"
+                onChange={(e) => setNewCard(prev => ({ ...prev, title: e.target.value }))}
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="company" className="text-right">
-                Company*
-              </Label>
+            
+            <div className="space-y-2">
+              <Label htmlFor="company">Company/Organization*</Label>
               <Input
                 id="company"
                 value={newCard.company}
-                onChange={(e) => setNewCard({...newCard, company: e.target.value})}
-                className="col-span-3"
+                onChange={(e) => setNewCard(prev => ({ ...prev, company: e.target.value }))}
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="email" className="text-right">
-                Email*
-              </Label>
+            
+            <div className="space-y-2">
+              <Label htmlFor="email">Email Address*</Label>
               <Input
                 id="email"
-                type="email"
                 value={newCard.email}
-                onChange={(e) => setNewCard({...newCard, email: e.target.value})}
-                className="col-span-3"
+                onChange={(e) => setNewCard(prev => ({ ...prev, email: e.target.value }))}
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="phone" className="text-right">
-                Phone
-              </Label>
+            
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone Number</Label>
               <Input
                 id="phone"
-                value={newCard.phone}
-                onChange={(e) => setNewCard({...newCard, phone: e.target.value})}
-                className="col-span-3"
+                value={newCard.phone || ""}
+                onChange={(e) => setNewCard(prev => ({ ...prev, phone: e.target.value }))}
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="tagline" className="text-right">
-                Tagline
-              </Label>
+            
+            <div className="space-y-2">
+              <Label htmlFor="website">Website</Label>
               <Input
+                id="website"
+                value={newCard.website || ""}
+                onChange={(e) => setNewCard(prev => ({ ...prev, website: e.target.value }))}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="linkedin">LinkedIn</Label>
+              <Input
+                id="linkedin"
+                value={newCard.linkedin || ""}
+                onChange={(e) => setNewCard(prev => ({ ...prev, linkedin: e.target.value }))}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="tagline">Tagline/Bio</Label>
+              <Textarea
                 id="tagline"
-                value={newCard.tagline}
-                onChange={(e) => setNewCard({...newCard, tagline: e.target.value})}
-                className="col-span-3"
+                value={newCard.tagline || ""}
+                onChange={(e) => setNewCard(prev => ({ ...prev, tagline: e.target.value }))}
+                placeholder="A brief professional statement"
+                rows={2}
               />
             </div>
           </div>
+          
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddCardDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleAddCard}>Save Card</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      {/* Add Event Dialog */}
-      <Dialog open={showEventDialog} onOpenChange={setShowEventDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add Networking Event</DialogTitle>
-            <DialogDescription>
-              Add a new networking event to your calendar.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="event-title" className="text-right">
-                Title*
-              </Label>
-              <Input
-                id="event-title"
-                value={newEvent.title}
-                onChange={(e) => setNewEvent({...newEvent, title: e.target.value})}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="event-date" className="text-right">
-                Date*
-              </Label>
-              <Input
-                id="event-date"
-                type="date"
-                value={newEvent.date}
-                onChange={(e) => setNewEvent({...newEvent, date: e.target.value})}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="event-location" className="text-right">
-                Location*
-              </Label>
-              <Input
-                id="event-location"
-                value={newEvent.location}
-                onChange={(e) => setNewEvent({...newEvent, location: e.target.value})}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="event-type" className="text-right">
-                Type*
-              </Label>
-              <select
-                id="event-type"
-                value={newEvent.type}
-                onChange={(e) => setNewEvent({...newEvent, type: e.target.value as any})}
-                className="col-span-3 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option value="conference">Conference</option>
-                <option value="workshop">Workshop</option>
-                <option value="meetup">Meetup</option>
-                <option value="webinar">Webinar</option>
-              </select>
-            </div>
-            <div className="grid grid-cols-4 items-start gap-4">
-              <Label htmlFor="event-description" className="text-right pt-2">
-                Description
-              </Label>
-              <Textarea
-                id="event-description"
-                value={newEvent.description}
-                onChange={(e) => setNewEvent({...newEvent, description: e.target.value})}
-                className="col-span-3"
-                rows={3}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEventDialog(false)}>
-              Cancel
+            <Button onClick={handleAddCard}>
+              Create Card
             </Button>
-            <Button onClick={handleAddEvent}>Add Event</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
       
-      {/* Connection Details Dialog */}
-      {selectedConnection && (
-        <Dialog open={!!selectedConnection} onOpenChange={(open) => !open && setSelectedConnection(null)}>
-          <DialogContent className="sm:max-w-md">
+      {/* Edit Resume Section Dialog */}
+      {selectedResumeSection && (
+        <Dialog
+          open={!!selectedResumeSection}
+          onOpenChange={(open) => !open && setSelectedResumeSection(null)}
+        >
+          <DialogContent>
             <DialogHeader>
-              <DialogTitle>Connection Details</DialogTitle>
+              <DialogTitle>Edit Resume Section</DialogTitle>
+              <DialogDescription>
+                Update this section of your resume.
+              </DialogDescription>
             </DialogHeader>
-            <div className="py-4">
-              <div className="flex items-start space-x-4 mb-4">
-                <Avatar className="h-16 w-16">
-                  <AvatarImage src={selectedConnection.avatarUrl} />
-                  <AvatarFallback>{selectedConnection.name.charAt(0)}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <h2 className="font-bold text-xl">{selectedConnection.name}</h2>
-                  <p className="text-muted-foreground">{selectedConnection.title}</p>
-                  <p className="text-muted-foreground">{selectedConnection.company}</p>
-                </div>
+            
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label htmlFor="edit-title">Title*</Label>
+                <Input
+                  id="edit-title"
+                  value={selectedResumeSection.title}
+                  onChange={(e) => setSelectedResumeSection({ ...selectedResumeSection, title: e.target.value })}
+                />
               </div>
               
-              <div className="space-y-3">
-                <h3 className="font-medium text-sm">Tags</h3>
-                <div className="flex flex-wrap gap-2">
-                  {selectedConnection.tags.map((tag, i) => (
-                    <Badge key={i} variant="secondary">{tag}</Badge>
-                  ))}
+              {selectedResumeSection.type !== "skills" && (
+                <div className="space-y-2">
+                  <Label htmlFor="edit-organization">
+                    {selectedResumeSection.type === "experience" ? "Company*" :
+                     selectedResumeSection.type === "education" ? "Institution*" :
+                     selectedResumeSection.type === "projects" ? "Organization" :
+                     "Issuing Organization*"}
+                  </Label>
+                  <Input
+                    id="edit-organization"
+                    value={selectedResumeSection.organization || ""}
+                    onChange={(e) => setSelectedResumeSection({ ...selectedResumeSection, organization: e.target.value })}
+                  />
                 </div>
-                
-                <h3 className="font-medium text-sm mt-4">Contact History</h3>
-                {selectedConnection.lastContact ? (
-                  <div className="text-sm">
-                    <p>Last contacted: {selectedConnection.lastContact}</p>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No contact history available</p>
-                )}
-                
-                <h3 className="font-medium text-sm mt-4">Actions</h3>
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline">
-                    <Mail className="h-4 w-4 mr-1" />
-                    Message
-                  </Button>
-                  <Button size="sm" variant="outline">
-                    <CalendarIcon className="h-4 w-4 mr-1" />
-                    Schedule
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="destructive"
-                    onClick={() => {
-                      handleRemoveConnection(selectedConnection.id)
-                      setSelectedConnection(null)
+              )}
+              
+              <div className="space-y-2">
+                <Label htmlFor="edit-date">
+                  {selectedResumeSection.type === "experience" || selectedResumeSection.type === "education" ? "Date Range" :
+                   selectedResumeSection.type === "projects" ? "Completion Date" :
+                   "Issue Date"}
+                </Label>
+                <Input
+                  id="edit-date"
+                  value={selectedResumeSection.date || ""}
+                  onChange={(e) => setSelectedResumeSection({ ...selectedResumeSection, date: e.target.value })}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="edit-description">Description</Label>
+                <Textarea
+                  id="edit-description"
+                  value={selectedResumeSection.description}
+                  onChange={(e) => setSelectedResumeSection({ ...selectedResumeSection, description: e.target.value })}
+                  rows={2}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Key Points (Bullet Points)</Label>
+                {selectedResumeSection.bullets?.map((bullet, index) => (
+                  <Input
+                    key={index}
+                    value={bullet}
+                    onChange={(e) => {
+                      const newBullets = [...(selectedResumeSection.bullets || [])];
+                      newBullets[index] = e.target.value;
+                      setSelectedResumeSection({ ...selectedResumeSection, bullets: newBullets });
                     }}
-                  >
-                    <X className="h-4 w-4 mr-1" />
-                    Remove
-                  </Button>
-                </div>
+                    className="mb-2"
+                  />
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedResumeSection({ 
+                    ...selectedResumeSection, 
+                    bullets: [...(selectedResumeSection.bullets || []), ""] 
+                  })}
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" />
+                  Add Bullet
+                </Button>
               </div>
             </div>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSelectedResumeSection(null)}>
+                Cancel
+              </Button>
+              <Button onClick={handleEditResumeSection}>
+                Save Changes
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       )}
+      
+      {/* Share Business Card Dialog */}
+      <Dialog
+        open={!!showShareCardDialog}
+        onOpenChange={(open) => !open && setShowShareCardDialog(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Share Business Card</DialogTitle>
+            <DialogDescription>
+              Share your business card with your network.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex flex-col items-center justify-center p-4">
+            {showShareCardDialog && (
+              <div className="w-full max-w-sm p-4 border rounded-lg bg-card">
+                <div className="flex flex-col items-center text-center">
+                  <Avatar className="h-16 w-16 mb-2">
+                    <AvatarFallback>{myCards.find(c => c.id === showShareCardDialog)?.name.charAt(0) || "U"}</AvatarFallback>
+                  </Avatar>
+                  <h3 className="font-bold text-lg">
+                    {myCards.find(c => c.id === showShareCardDialog)?.name}
+                  </h3>
+                  <p className="text-muted-foreground">
+                    {myCards.find(c => c.id === showShareCardDialog)?.title}
+                  </p>
+                  <p className="text-muted-foreground">
+                    {myCards.find(c => c.id === showShareCardDialog)?.company}
+                  </p>
+                  
+                  <Separator className="my-3" />
+                  
+                  <div className="w-full text-sm space-y-2">
+                    <div className="flex items-center justify-center gap-2">
+                      <Mail className="h-4 w-4" />
+                      <span>{myCards.find(c => c.id === showShareCardDialog)?.email}</span>
+                    </div>
+                    
+                    {myCards.find(c => c.id === showShareCardDialog)?.phone && (
+                      <div className="flex items-center justify-center gap-2">
+                        <Phone className="h-4 w-4" />
+                        <span>{myCards.find(c => c.id === showShareCardDialog)?.phone}</span>
+                      </div>
+                    )}
+                    
+                    {myCards.find(c => c.id === showShareCardDialog)?.website && (
+                      <div className="flex items-center justify-center gap-2">
+                        <Globe className="h-4 w-4" />
+                        <span>{myCards.find(c => c.id === showShareCardDialog)?.website}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div className="flex w-full justify-center gap-2 mt-4">
+              <Button variant="outline">
+                <Download className="h-4 w-4 mr-2" />
+                Download
+              </Button>
+              <Button>
+                <Share2 className="h-4 w-4 mr-2" />
+                Share
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
