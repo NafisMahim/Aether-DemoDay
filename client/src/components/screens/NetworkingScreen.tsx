@@ -135,16 +135,21 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
       (quizResults.personalityType || quizResults.primaryType)
     
     // Based on personality type and career interests, generate relevant suggestions
+    // Ensure personality type is a string
     const personalityType = hasQuizResults 
-      ? (quizResults.personalityType || quizResults.primaryType || "")
+      ? String(quizResults.personalityType || quizResults.primaryType || "")
       : "Professional"
     
     const strengths = hasQuizResults && quizResults.strengths 
-      ? quizResults.strengths 
+      ? Array.isArray(quizResults.strengths) 
+        ? quizResults.strengths 
+        : ["Communication", "Leadership"] 
       : ["Communication", "Leadership"]
       
     const careerInterests = hasQuizResults && quizResults.careerInterests 
-      ? quizResults.careerInterests 
+      ? Array.isArray(quizResults.careerInterests)
+        ? quizResults.careerInterests
+        : ["Technology", "Business"]
       : ["Technology", "Business"]
     
     // Generate titles and companies based on strengths and career interests
@@ -152,7 +157,7 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
       {
         id: "s1",
         name: "Taylor Reed",
-        title: personalityType.includes("Creative") ? "Creative Director" : "Senior Developer",
+        title: personalityType.toLowerCase().indexOf("creative") >= 0 ? "Creative Director" : "Senior Developer",
         company: "InnovateX",
         avatarUrl: "",
         tags: [personalityType, ...strengths.slice(0, 1)],
@@ -161,7 +166,7 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
       {
         id: "s2",
         name: "Morgan Kim",
-        title: personalityType.includes("Analytical") ? "Data Scientist" : "Product Manager",
+        title: personalityType.toLowerCase().indexOf("analytical") >= 0 ? "Data Scientist" : "Product Manager",
         company: "FutureTech",
         avatarUrl: "",
         tags: careerInterests.slice(0, 2),
@@ -170,7 +175,7 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
       {
         id: "s3",
         name: "Riley Johnson",
-        title: personalityType.includes("Practical") ? "Operations Manager" : "Marketing Strategist",
+        title: personalityType.toLowerCase().indexOf("practical") >= 0 ? "Operations Manager" : "Marketing Strategist",
         company: "GrowthSolutions",
         avatarUrl: "",
         tags: strengths.slice(0, 2),
