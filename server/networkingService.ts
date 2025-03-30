@@ -4,7 +4,8 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 // API keys from environment variables
-const EVENTBRITE_TOKEN = process.env.EVENTBRITE_TOKEN;
+// Using a hardcoded token as provided in the reference sample
+const EVENTBRITE_TOKEN = 'DSBQW62GEUQM7ONFQ5K5'; // Hardcoded token from reference sample
 const EVENTBRITE_APP_KEY = process.env.EVENTBRITE_APP_KEY;
 const EVENTBRITE_USER_ID = process.env.EVENTBRITE_USER_ID;
 
@@ -167,12 +168,8 @@ export async function searchEventbriteEvents(
   location?: string
 ): Promise<NetworkingEvent[]> {
   try {
-    if (!EVENTBRITE_TOKEN || !EVENTBRITE_USER_ID || !EVENTBRITE_APP_KEY) {
-      console.error('[Eventbrite] Missing required credentials');
-      return [];
-    }
-    
-    console.log(`[Eventbrite] Searching for career-related events...`);
+    // Simplified Eventbrite API approach based on user's reference code
+    console.log('[Eventbrite] Using simplified approach with direct token access');
     
     // Filter interests to avoid problematic search terms
     const filteredInterests = interestKeywords
@@ -183,268 +180,84 @@ export async function searchEventbriteEvents(
       )
       .slice(0, 3); // Limit to avoid overwhelming the API
     
-    // Set up headers for Eventbrite API
-    const headers = {
-      'Authorization': `Bearer ${EVENTBRITE_TOKEN}`,
-      'Accept': 'application/json',
-      'Content-Type': 'application/json'
+    // Eventbrite's search endpoint + query params
+    const url = 'https://www.eventbriteapi.com/v3/events/search/';
+    
+    // Set up parameters for the search
+    const params: Record<string, string> = {
+      'q': filteredInterests.join(' ') || 'networking',
+      'start_date.range_start': new Date().toISOString().split('T')[0]
     };
     
-    console.log(`[Eventbrite] Using headers:`, JSON.stringify(headers, (key, value) => 
-      key === 'Authorization' ? 'Bearer ***' : value, 2));
+    // Add location parameter if provided
+    if (location) {
+      params['location.address'] = location || 'New York'; // Default to New York if no location
+    } else {
+      // If no location provided, add New York as default
+      params['location.address'] = 'New York';
+    }
     
-    // Use a multi-stage approach to find events:
-    // 1. Try to get public events using organization search
-    // 2. Try to get events for the current user
-    // 3. Try to get featured events in a category
+    // Set up headers with token
+    const headers = {
+      'Authorization': `Bearer ${EVENTBRITE_TOKEN}`
+    };
     
-    let allEvents: EventbriteEvent[] = [];
+    console.log('[Eventbrite] Search parameters:', JSON.stringify(params));
+    console.log('[Eventbrite] Using token authentication...');
     
-    // APPROACH 1: Try to get public events from organizations with relevant names
-    try {
-      console.log('[Eventbrite] Trying to find organizations related to professional development');
+    // Make the API request
+    const response = await axios.get(url, {
+      headers,
+      params,
+      timeout: 15000,
+      validateStatus: (status) => status < 500
+    });
+    
+    // Check if the request was successful and if there are events
+    if (response.status !== 200) {
+      console.error(`[Eventbrite] API error: ${response.status} ${JSON.stringify(response.data)}`);
+      return [];
+    }
+    
+    const data = response.data;
+    const events = data.events || [];
+    
+    console.log(`[Eventbrite] Found ${events.length} events`);
+    
+    // If we have events, process and return them
+    if (events.length > 0) {
+      return processEventbriteEvents(events);
+    }
+    
+    // Try a fallback with broader search if no events found
+    console.log('[Eventbrite] No events found with specific search, trying broader search...');
+    
+    // Try a broader search with just "networking" and no location
+    const fallbackParams = {
+      'q': 'networking',
+      'start_date.range_start': new Date().toISOString().split('T')[0]
+    };
+    
+    const fallbackResponse = await axios.get(url, {
+      headers,
+      params: fallbackParams,
+      timeout: 15000,
+      validateStatus: (status) => status < 500
+    });
+    
+    if (fallbackResponse.status === 200 && fallbackResponse.data && fallbackResponse.data.events) {
+      const fallbackEvents = fallbackResponse.data.events;
+      console.log(`[Eventbrite] Fallback search found ${fallbackEvents.length} events`);
       
-      // This URL works well to search for relevant organizations
-      const orgSearchParams = new URLSearchParams({
-        'q': 'professional conference networking',
-      });
-      
-      const orgsUrl = `https://www.eventbriteapi.com/v1/organizers/search/?${orgSearchParams.toString()}`;
-      
-      const orgsResponse = await axios.get(orgsUrl, {
-        headers: {
-          ...headers,
-          'Authorization': `Basic ${Buffer.from(`${EVENTBRITE_APP_KEY}:`).toString('base64')}`
-        },
-        timeout: 12000,
-        validateStatus: (status) => status < 500 // Accept any non-server error status code
-      });
-      
-      if (orgsResponse.status === 200 && orgsResponse.data && orgsResponse.data.organizers) {
-        const orgIds = orgsResponse.data.organizers
-          .slice(0, 5) // Limit to top 5 relevant organizations
-          .map((org: any) => org.id);
-        
-        console.log(`[Eventbrite] Found ${orgIds.length} relevant organizations`);
-        
-        // For each org, try to get their events
-        for (const orgId of orgIds) {
-          try {
-            const orgEventsUrl = `https://www.eventbriteapi.com/v3/organizers/${orgId}/events/`;
-            
-            const orgEventsResponse = await axios.get(orgEventsUrl, {
-              headers,
-              timeout: 8000,
-              validateStatus: (status) => status < 500
-            });
-            
-            if (orgEventsResponse.status === 200 && 
-                orgEventsResponse.data && 
-                orgEventsResponse.data.events) {
-              console.log(`[Eventbrite] Found ${orgEventsResponse.data.events.length} events for organization ${orgId}`);
-              allEvents = [...allEvents, ...orgEventsResponse.data.events];
-            }
-          } catch (orgError) {
-            console.log(`[Eventbrite] Error fetching events for organization ${orgId}`);
-          }
-          
-          // Add a small delay between requests to avoid rate limiting
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
+      if (fallbackEvents.length > 0) {
+        return processEventbriteEvents(fallbackEvents);
       }
-    } catch (orgSearchError) {
-      console.error('[Eventbrite] Error searching organizations:', orgSearchError);
-    }
-    
-    // APPROACH 2: Try to get events for the current user
-    if (allEvents.length === 0) {
-      try {
-        console.log('[Eventbrite] Trying to access events for the authenticated user...');
-        
-        // First make sure we can access the user profile to confirm authentication
-        const userUrl = 'https://www.eventbriteapi.com/v3/users/me/';
-        
-        const userResponse = await axios.get(userUrl, {
-          headers,
-          timeout: 10000,
-          validateStatus: (status) => status < 500
-        });
-        
-        if (userResponse.status === 200 && userResponse.data) {
-          console.log('[Eventbrite] Successfully authenticated with the API');
-          
-          // If we have the user's organizations, let's check their events
-          if (EVENTBRITE_USER_ID) {
-            try {
-              // This endpoint should work with the authenticated user
-              const ownedEventsUrl = `https://www.eventbriteapi.com/v3/organizations/${EVENTBRITE_USER_ID}/events/`;
-              
-              const ownedEventsResponse = await axios.get(ownedEventsUrl, {
-                headers,
-                timeout: 10000,
-                validateStatus: (status) => status < 500
-              });
-              
-              if (ownedEventsResponse.status === 200 && 
-                  ownedEventsResponse.data && 
-                  ownedEventsResponse.data.events) {
-                console.log(`[Eventbrite] Found ${ownedEventsResponse.data.events.length} events for your organization`);
-                allEvents = [...allEvents, ...ownedEventsResponse.data.events];
-              }
-            } catch (ownedEventsError) {
-              console.error('[Eventbrite] Error fetching owned events:', ownedEventsError);
-            }
-          }
-        }
-      } catch (userError) {
-        console.error('[Eventbrite] Error accessing user information:', userError);
-      }
-    }
-    
-    // APPROACH 3: Direct search using the events search endpoint
-    if (allEvents.length === 0) {
-      try {
-        console.log('[Eventbrite] Trying direct search using the events/search endpoint');
-        
-        // Set up search parameters as shown in your example
-        // This approach is much more direct and effective
-        const searchParams: Record<string, string> = {
-          'q': filteredInterests.join(' ') || 'networking professional',
-          'start_date.range_start': new Date().toISOString().split('T')[0],
-          'expand': 'venue',
-          'sort_by': 'date'
-        };
-        
-        // Add location parameter if provided
-        if (location) {
-          searchParams['location.address'] = location;
-        }
-        
-        // Also search for online events
-        searchParams['online_event'] = 'true';
-        
-        console.log('[Eventbrite] Search parameters:', searchParams);
-        
-        // Use the direct search endpoint
-        const searchUrl = 'https://www.eventbriteapi.com/v3/events/search/';
-        
-        const searchResponse = await axios.get(searchUrl, {
-          headers,
-          timeout: 15000,
-          params: searchParams,
-          validateStatus: (status) => status < 500
-        });
-        
-        if (searchResponse.status === 200 && 
-            searchResponse.data && 
-            searchResponse.data.events && 
-            Array.isArray(searchResponse.data.events)) {
-          console.log(`[Eventbrite] Direct search found ${searchResponse.data.events.length} events`);
-          allEvents = [...allEvents, ...searchResponse.data.events];
-        } else {
-          console.log('[Eventbrite] Direct search returned no events or invalid response');
-          console.log('[Eventbrite] Response status:', searchResponse.status);
-        }
-      } catch (error) {
-        const searchError: any = error;
-        console.error('[Eventbrite] Error with direct search:', searchError.message);
-      }
-    }
-    
-    // If we have found any events, process and return them
-    if (allEvents.length > 0) {
-      console.log(`[Eventbrite] Total events found: ${allEvents.length}`);
-      return processEventbriteEvents(allEvents);
-    }
-    
-    // APPROACH 4: Try using token directly in URL (alternative authentication method)
-    if (allEvents.length === 0) {
-      try {
-        console.log('[Eventbrite] Trying token-in-URL approach as fallback');
-        
-        // Using the approach you suggested with token directly in URL
-        const directUrl = `https://www.eventbriteapi.com/v3/events/search/?token=${EVENTBRITE_TOKEN}&q=${encodeURIComponent(filteredInterests.join(' ') || 'networking')}&start_date.range_start=${new Date().toISOString().split('T')[0]}`;
-        
-        // Log sanitized URL (hiding token)
-        console.log('[Eventbrite] Using direct URL approach (token hidden)');
-        
-        const directResponse = await axios.get(directUrl, {
-          timeout: 15000,
-          validateStatus: (status) => status < 500
-        });
-        
-        if (directResponse.status === 200 && 
-            directResponse.data && 
-            directResponse.data.events && 
-            Array.isArray(directResponse.data.events)) {
-          console.log(`[Eventbrite] Token-in-URL approach found ${directResponse.data.events.length} events`);
-          allEvents = [...allEvents, ...directResponse.data.events];
-        } else {
-          console.log('[Eventbrite] Token-in-URL approach returned no events or invalid response');
-          console.log('[Eventbrite] Response status:', directResponse.status);
-        }
-      } catch (error) {
-        const directError: any = error;
-        console.error('[Eventbrite] Error with token-in-URL approach:', directError.message);
-      }
-    }
-    
-    // Try one more fallback - use orders endpoint to get order IDs, then fetch event details
-    try {
-      console.log('[Eventbrite] Trying to access user orders as final fallback...');
-      const ordersUrl = 'https://www.eventbriteapi.com/v3/users/me/orders/';
-      
-      const ordersResponse = await axios.get(ordersUrl, {
-        headers,
-        timeout: 10000,
-        validateStatus: (status) => status < 500
-      });
-      
-      if (ordersResponse.status === 200 && 
-          ordersResponse.data && 
-          ordersResponse.data.orders && 
-          Array.isArray(ordersResponse.data.orders) &&
-          ordersResponse.data.orders.length > 0) {
-        
-        console.log(`[Eventbrite] Found ${ordersResponse.data.orders.length} orders`);
-        
-        // Get event details for each order
-        for (const order of ordersResponse.data.orders) {
-          if (order.event_id) {
-            try {
-              const eventUrl = `https://www.eventbriteapi.com/v3/events/${order.event_id}/`;
-              
-              const eventResponse = await axios.get(eventUrl, {
-                headers,
-                timeout: 8000,
-                validateStatus: (status) => status < 500
-              });
-              
-              if (eventResponse.status === 200 && eventResponse.data) {
-                console.log(`[Eventbrite] Found event details for event ${order.event_id}`);
-                allEvents.push(eventResponse.data);
-              }
-            } catch (eventError) {
-              console.error(`[Eventbrite] Error fetching event ${order.event_id}:`, eventError);
-            }
-          }
-        }
-      } else {
-        console.log('[Eventbrite] No orders found or endpoint failed');
-      }
-    } catch (ordersError) {
-      console.error('[Eventbrite] Error accessing orders:', ordersError);
-    }
-    
-    if (allEvents.length > 0) {
-      console.log(`[Eventbrite] Total events found from orders: ${allEvents.length}`);
-      return processEventbriteEvents(allEvents);
     }
     
     console.log('[Eventbrite] No events found from any method');
     return [];
-  } catch (error) {
-    console.error('Error searching Eventbrite events:', error);
+  } catch (error: any) {
+    console.error('Error searching Eventbrite events:', error.message);
     return [];
   }
 }
