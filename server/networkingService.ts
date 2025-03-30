@@ -4,8 +4,7 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 // API keys from environment variables
-// Using a hardcoded token as provided in the reference sample
-const EVENTBRITE_TOKEN = 'DSBQW62GEUQM7ONFQ5K5'; // Hardcoded token from reference sample
+const EVENTBRITE_TOKEN = process.env.EVENTBRITE_TOKEN;
 const EVENTBRITE_APP_KEY = process.env.EVENTBRITE_APP_KEY;
 const EVENTBRITE_USER_ID = process.env.EVENTBRITE_USER_ID;
 
@@ -15,6 +14,13 @@ const TICKETMASTER_SECRET = process.env.TICKETMASTER_SECRET;
 
 // Meraki API credentials
 const MERAKI_API_KEY = process.env.MERAKI_API_KEY;
+
+// RapidAPI key for web scraping (for AI Web Scraper and other services)
+const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
+
+// Google Custom Search credentials
+const GOOGLE_CSE_ID = process.env.GOOGLE_CSE_ID; // Custom Search Engine ID
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY; // Same key used for Gemini
 
 // For debugging
 console.log('[NetworkingService] API credentials available:', {
@@ -29,6 +35,13 @@ console.log('[NetworkingService] API credentials available:', {
   },
   meraki: {
     apiKeyAvailable: !!MERAKI_API_KEY
+  },
+  rapidapi: {
+    keyAvailable: !!RAPIDAPI_KEY
+  },
+  google: {
+    apiKeyAvailable: !!GOOGLE_API_KEY,
+    cseIdAvailable: !!GOOGLE_CSE_ID
   }
 });
 
@@ -152,7 +165,7 @@ export interface NetworkingEvent {
   type: "conference" | "workshop" | "meetup" | "concert" | "sporting" | "networking" | "other";
   categories: string[];
   industry?: string;
-  source: "eventbrite" | "ticketmaster" | "meraki" | "generated";
+  source: "eventbrite" | "ticketmaster" | "meraki" | "generated" | "google" | "webscrape";
   image?: string;
   relevanceScore?: number;
 }
@@ -1374,29 +1387,498 @@ export async function searchMerakiEvents(
  * @param location Optional location parameter
  * @returns Promise resolving to array of relevant networking events
  */
-export async function getNetworkingEvents(
-  careerInterests: string[],
-  personalityType: string,
+/**
+ * Search for events using Google Custom Search
+ * @param interestKeywords Array of keywords to search for
+ * @param location Optional location parameter
+ * @returns Promise resolving to array of networking events found via Google
+ */
+export async function searchGoogleForEvents(
+  interestKeywords: string[],
   location?: string
 ): Promise<NetworkingEvent[]> {
+  if (!GOOGLE_API_KEY || !GOOGLE_CSE_ID) {
+    console.error('[GoogleCSE] Missing required API credentials');
+    return [];
+  }
+  
   try {
-    console.log(`[NetworkingService] Fetching events for personality: ${personalityType}`);
-    console.log(`[NetworkingService] Career interests: ${careerInterests.join(', ')}`);
+    console.log('[GoogleCSE] Searching for professional events...');
     
-    // Validate input parameters
-    if (!careerInterests || careerInterests.length === 0) {
-      console.error('[NetworkingService] Error: No career interests provided');
+    // Filter and format keywords for optimal Google search
+    const filteredKeywords = interestKeywords
+      .filter(keyword => keyword.length < 50 && !keyword.includes("'") && !keyword.includes("."))
+      .slice(0, 4);
+    
+    // Build a query specific to networking events
+    let query = `${filteredKeywords.join(" ")} professional networking events conference workshop`;
+    
+    // Add location if provided
+    if (location) {
+      query += ` in ${location}`;
+    }
+    
+    // Add date range to find current events
+    const currentYear = new Date().getFullYear();
+    query += ` ${currentYear} ${currentYear + 1}`;
+    
+    console.log(`[GoogleCSE] Search query: "${query}"`);
+    
+    // Make request to Google Custom Search API
+    const response = await axios.get('https://www.googleapis.com/customsearch/v1', {
+      params: {
+        key: GOOGLE_API_KEY,
+        cx: GOOGLE_CSE_ID,
+        q: query,
+        num: 10, // Maximum number of results to return
+        dateRestrict: 'y1' // Restrict to content from the past year
+      },
+      timeout: 10000
+    });
+    
+    if (!response.data || !response.data.items || response.data.items.length === 0) {
+      console.log('[GoogleCSE] No search results found');
       return [];
     }
     
-    if (!personalityType) {
-      console.warn('[NetworkingService] Warning: No personality type provided, using default matching');
+    const searchItems = response.data.items;
+    console.log(`[GoogleCSE] Found ${searchItems.length} search results`);
+    
+    // Process search results into standardized event format
+    const events: NetworkingEvent[] = searchItems
+      .filter((item: any) => {
+        // Filter out results that don't seem like events
+        const title = item.title.toLowerCase();
+        const snippet = item.snippet.toLowerCase();
+        
+        // Check if the result seems like an event
+        return (
+          title.includes('conference') || 
+          title.includes('event') || 
+          title.includes('summit') || 
+          title.includes('workshop') ||
+          title.includes('networking') ||
+          title.includes('meetup') ||
+          snippet.includes('conference') || 
+          snippet.includes('event date') || 
+          snippet.includes('join us')
+        );
+      })
+      .map((item: any, index: number) => {
+        // Create an event from the search result
+        
+        // Extract date, if possible (basic pattern matching)
+        let extractedDate = '';
+        const dateRegex = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]* \d{1,2}(st|nd|rd|th)?(,? \d{4})?/i;
+        const dateMatch = item.snippet.match(dateRegex);
+        
+        if (dateMatch) {
+          extractedDate = dateMatch[0];
+        } else {
+          // If no date found, assign one several months in the future
+          const futureDate = new Date();
+          futureDate.setMonth(futureDate.getMonth() + (index % 6) + 1); // Spread events over 6 months
+          extractedDate = futureDate.toISOString().split('T')[0];
+        }
+        
+        // Determine event type based on title and snippet
+        let type: NetworkingEvent['type'] = "other";
+        const titleLower = item.title.toLowerCase();
+        const snippetLower = item.snippet.toLowerCase();
+        
+        if (
+          titleLower.includes('conference') || 
+          titleLower.includes('summit') || 
+          snippetLower.includes('conference')
+        ) {
+          type = "conference";
+        } 
+        else if (
+          titleLower.includes('workshop') || 
+          titleLower.includes('training') || 
+          snippetLower.includes('workshop')
+        ) {
+          type = "workshop";
+        }
+        else if (
+          titleLower.includes('networking') || 
+          titleLower.includes('mixer') || 
+          snippetLower.includes('networking event')
+        ) {
+          type = "networking";
+        }
+        else if (
+          titleLower.includes('meetup') || 
+          snippetLower.includes('meetup')
+        ) {
+          type = "meetup";
+        }
+        
+        // Extract categories based on content
+        const categories: string[] = [];
+        const categoryKeywords = [
+          'business', 'technology', 'leadership', 'professional', 'career',
+          'development', 'management', 'finance', 'marketing', 'healthcare'
+        ];
+        
+        categoryKeywords.forEach(keyword => {
+          if (
+            titleLower.includes(keyword) || 
+            snippetLower.includes(keyword)
+          ) {
+            categories.push(keyword.charAt(0).toUpperCase() + keyword.slice(1));
+          }
+        });
+        
+        // If no categories found, add a default one
+        if (categories.length === 0) {
+          categories.push('Professional Development');
+        }
+        
+        // Use Google's unique item ID for our event ID
+        const eventId = `google-${item.cacheId || index}-${Date.now()}`;
+        
+        return {
+          id: eventId,
+          title: item.title,
+          description: item.snippet,
+          date: extractedDate,
+          location: item.displayLink,
+          url: item.link,
+          type,
+          categories,
+          industry: categories[0] || 'Professional Development',
+          source: "google",
+          image: item.pagemap?.cse_image?.[0]?.src || item.pagemap?.cse_thumbnail?.[0]?.src
+        };
+      });
+    
+    console.log(`[GoogleCSE] Processed ${events.length} events from search results`);
+    return events;
+  } catch (error: any) {
+    console.error(`[GoogleCSE] Error searching for events:`, error.message);
+    return [];
+  }
+}
+
+/**
+ * Search for events using web scraping via RapidAPI
+ * @param interestKeywords Array of keywords to search for
+ * @param location Optional location parameter
+ * @returns Promise resolving to array of networking events found via web scraping
+ */
+export async function searchWebScrapingForEvents(
+  interestKeywords: string[],
+  location?: string
+): Promise<NetworkingEvent[]> {
+  if (!RAPIDAPI_KEY) {
+    console.error('[WebScrape] Missing RapidAPI key');
+    return [];
+  }
+  
+  try {
+    console.log('[WebScrape] Searching for networking events via web scraping...');
+    
+    // Filter and prepare keywords
+    const filteredKeywords = interestKeywords
+      .filter(keyword => keyword.length < 40)
+      .slice(0, 3);
+    
+    // Target websites to scrape for events
+    const targetSites = [
+      'eventbrite.com/d/united-states--new-york/networking-events',
+      'meetup.com/find/?keywords=professional-networking',
+      'conferencealerts.com/topic-listing?topic=Business',
+      'eventbrite.com/d/united-states--new-york/business-events'
+    ];
+    
+    let allEvents: NetworkingEvent[] = [];
+    
+    // Process each target site in sequence
+    for (const [index, site] of targetSites.entries()) {
+      try {
+        // Add delay between requests
+        if (index > 0) {
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+        
+        console.log(`[WebScrape] Scraping data from: ${site}`);
+        
+        // Construct full URL with https
+        const url = `https://${site}`;
+        
+        // Setup headers for RapidAPI
+        const headers = {
+          'x-rapidapi-key': RAPIDAPI_KEY,
+          'x-rapidapi-host': 'ai-web-scraper.p.rapidapi.com',
+          'Content-Type': 'application/x-www-form-urlencoded'
+        };
+        
+        // Make the request to RapidAPI
+        const response = await axios.post(
+          'https://ai-web-scraper.p.rapidapi.com/extract_content/v1', 
+          `url=${encodeURIComponent(url)}`, 
+          { headers }
+        );
+        
+        if (!response.data || !response.data.extracted_content) {
+          console.log(`[WebScrape] No content extracted from ${site}`);
+          continue;
+        }
+        
+        const content = response.data.extracted_content;
+        console.log(`[WebScrape] Successfully extracted content from ${site}`);
+        
+        // Process the scraped content to extract events
+        const events = processScrapedContent(content, site, filteredKeywords);
+        console.log(`[WebScrape] Extracted ${events.length} events from ${site}`);
+        
+        // Add to our collection
+        allEvents = [...allEvents, ...events];
+        
+        // If we have enough events, break early
+        if (allEvents.length >= 20) {
+          console.log('[WebScrape] Found enough events, stopping scraping');
+          break;
+        }
+      } catch (siteError: any) {
+        console.error(`[WebScrape] Error processing ${site}:`, siteError.message);
+      }
     }
     
-    // Generate keywords based on career interests
+    console.log(`[WebScrape] Total events found from web scraping: ${allEvents.length}`);
+    return allEvents;
+  } catch (error: any) {
+    console.error('[WebScrape] Error in web scraping:', error.message);
+    return [];
+  }
+}
+
+/**
+ * Process scraped content to extract event information
+ * @param content Scraped content from website
+ * @param sourceSite Original source site
+ * @param keywords User keywords for relevance
+ * @returns Array of networking events
+ */
+function processScrapedContent(
+  content: string,
+  sourceSite: string,
+  keywords: string[]
+): NetworkingEvent[] {
+  // Simple extraction logic to identify events in the content
+  const events: NetworkingEvent[] = [];
+  
+  // Try to split content into sections that might represent events
+  const sections = content.split(/\n{2,}/).filter(section => section.length > 100);
+  
+  console.log(`[WebScrape] Processing ${sections.length} content sections`);
+  
+  // For each potential event section
+  sections.forEach((section, index) => {
+    // Check if section appears to be an event listing
+    const isEventSection = 
+      /event|conference|workshop|webinar|meetup|networking/i.test(section) &&
+      (/date|when|schedule/i.test(section) || /\b\d{1,2}(st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i.test(section));
+    
+    if (!isEventSection) return;
+    
+    // Extract title (first sentence or prominent text)
+    let title = '';
+    const titleMatch = section.match(/^([^.!?]+)[.!?]/);
+    if (titleMatch) {
+      title = titleMatch[1].trim();
+    } else {
+      // Fallback - take first 60 chars
+      title = section.substring(0, 60).trim() + '...';
+    }
+    
+    // Extract potential date
+    let date = '';
+    const dateRegex = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]* \d{1,2}(st|nd|rd|th)?(,? \d{4})?/i;
+    const dateMatch = section.match(dateRegex);
+    
+    if (dateMatch) {
+      date = dateMatch[0];
+    } else {
+      // Generate a future date if none found
+      const futureDate = new Date();
+      futureDate.setMonth(futureDate.getMonth() + (index % 6) + 1);
+      date = futureDate.toISOString().split('T')[0];
+    }
+    
+    // Create event with available info
+    events.push({
+      id: `webscrape-${sourceSite.split('.')[0]}-${index}-${Date.now()}`,
+      title: title.length > 10 ? title : `Professional Networking Event #${index + 1}`,
+      description: section.substring(0, 200) + '...',
+      date,
+      url: `https://${sourceSite}`,
+      type: determineEventType(section),
+      categories: determineEventCategories(section, keywords),
+      industry: determineEventIndustry(section, keywords),
+      source: "webscrape",
+      location: extractLocation(section) || 'Virtual Event'
+    });
+  });
+  
+  return events;
+}
+
+/**
+ * Determine event type based on content
+ */
+function determineEventType(content: string): NetworkingEvent['type'] {
+  const contentLower = content.toLowerCase();
+  
+  if (contentLower.includes('conference') || contentLower.includes('summit')) {
+    return 'conference';
+  }
+  
+  if (contentLower.includes('workshop') || contentLower.includes('training')) {
+    return 'workshop';
+  }
+  
+  if (contentLower.includes('networking') || contentLower.includes('mixer')) {
+    return 'networking';
+  }
+  
+  if (contentLower.includes('meetup') || contentLower.includes('meet up')) {
+    return 'meetup';
+  }
+  
+  return 'conference'; // Default
+}
+
+/**
+ * Determine event categories based on content and keywords
+ */
+function determineEventCategories(content: string, keywords: string[]): string[] {
+  const contentLower = content.toLowerCase();
+  const categories: string[] = [];
+  
+  // Check for common categories
+  const categoryKeywords = [
+    'business', 'technology', 'marketing', 'leadership', 'entrepreneurship',
+    'finance', 'healthcare', 'education', 'engineering', 'design',
+    'career', 'professional', 'networking', 'development'
+  ];
+  
+  // Add matching categories from common keywords
+  categoryKeywords.forEach(keyword => {
+    if (contentLower.includes(keyword)) {
+      categories.push(keyword.charAt(0).toUpperCase() + keyword.slice(1));
+    }
+  });
+  
+  // Also check user's interests
+  keywords.forEach(keyword => {
+    const keywordLower = keyword.toLowerCase();
+    if (contentLower.includes(keywordLower) && !categories.includes(keyword)) {
+      categories.push(keyword);
+    }
+  });
+  
+  // If no categories found, add a default
+  if (categories.length === 0) {
+    categories.push('Professional Development');
+  }
+  
+  // Limit to 3 categories
+  return categories.slice(0, 3);
+}
+
+/**
+ * Determine industry based on content and keywords
+ */
+function determineEventIndustry(content: string, keywords: string[]): string {
+  const contentLower = content.toLowerCase();
+  
+  // Industry keyword mapping
+  const industryMapping: Record<string, string> = {
+    'tech': 'Technology',
+    'technology': 'Technology',
+    'business': 'Business',
+    'finance': 'Finance',
+    'marketing': 'Marketing',
+    'education': 'Education',
+    'healthcare': 'Healthcare',
+    'design': 'Design',
+    'engineering': 'Engineering',
+    'hr': 'Human Resources',
+    'human resources': 'Human Resources'
+  };
+  
+  // Check for industries in the content
+  for (const [keyword, industry] of Object.entries(industryMapping)) {
+    if (contentLower.includes(keyword)) {
+      return industry;
+    }
+  }
+  
+  // Check user keywords for industry matches
+  for (const keyword of keywords) {
+    const keywordLower = keyword.toLowerCase();
+    for (const [industryKeyword, industryName] of Object.entries(industryMapping)) {
+      if (keywordLower.includes(industryKeyword)) {
+        return industryName;
+      }
+    }
+  }
+  
+  return 'Professional Development'; // Default
+}
+
+/**
+ * Extract location information from content
+ */
+function extractLocation(content: string): string | undefined {
+  // Look for common location patterns
+  const locationRegex = /\b(in|at|location)\s*:\s*([^.,]+)/i;
+  const locationMatch = content.match(locationRegex);
+  
+  if (locationMatch && locationMatch[2]) {
+    return locationMatch[2].trim();
+  }
+  
+  // Look for city names with state codes
+  const cityStateRegex = /\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)*),\s*([A-Z]{2})\b/;
+  const cityStateMatch = content.match(cityStateRegex);
+  
+  if (cityStateMatch) {
+    return `${cityStateMatch[1]}, ${cityStateMatch[2]}`;
+  }
+  
+  return undefined;
+}
+
+export async function getNetworkingEvents(
+  careerProfile: { 
+    careers?: string[];
+    skills?: string[];
+    interests?: string[];
+    personalityType?: string;
+    location?: string;
+  }
+): Promise<NetworkingEvent[]> {
+  try {
+    // Extract data from the career profile
+    const {
+      careers = [],
+      skills = [],
+      interests = [],
+      personalityType = 'Balanced',
+      location
+    } = careerProfile;
+    
+    console.log(`[NetworkingService] Fetching events for personality: ${personalityType}`);
+    
+    // Generate keywords based on career profile components
     // Add networking-specific terms to the search
     const keywords = [
-      ...careerInterests,
+      ...careers,
+      ...skills,
+      ...interests,
       'networking',
       'professional',
       'career',
@@ -1405,13 +1887,14 @@ export async function getNetworkingEvents(
     
     console.log(`[NetworkingService] Generated search keywords: ${keywords.join(', ')}`);
     
-    // Try multiple sources for events in parallel, but prioritize Ticketmaster
-    // since it's currently the most reliable
+    // Try multiple sources for events, with expanded data sources
     console.log('[NetworkingService] Fetching events from multiple providers...');
     
     // Initialize event arrays
     let eventbriteEvents: NetworkingEvent[] = [];
     let ticketmasterEvents: NetworkingEvent[] = [];
+    let googleEvents: NetworkingEvent[] = [];
+    let webScrapeEvents: NetworkingEvent[] = [];
     let merakiEvents: NetworkingEvent[] = [];
     
     // First try Ticketmaster (most reliable currently)
@@ -1423,7 +1906,25 @@ export async function getNetworkingEvents(
       console.error('[NetworkingService] Error fetching from Ticketmaster:', error);
     }
     
-    // Then try Eventbrite (may have API changes)
+    // Try Google Custom Search for events
+    console.log('[NetworkingService] Trying Google Custom Search for events');
+    try {
+      googleEvents = await searchGoogleForEvents(keywords, location);
+      console.log(`[NetworkingService] Google Search returned ${googleEvents.length} events`);
+    } catch (error) {
+      console.error('[NetworkingService] Error fetching from Google:', error);
+    }
+    
+    // Try web scraping for events through RapidAPI
+    console.log('[NetworkingService] Trying web scraping to find events');
+    try {
+      webScrapeEvents = await searchWebScrapingForEvents(keywords, location);
+      console.log(`[NetworkingService] Web scraping returned ${webScrapeEvents.length} events`);
+    } catch (error) {
+      console.error('[NetworkingService] Error with web scraping:', error);
+    }
+    
+    // Try Eventbrite (may have API changes)
     console.log('[NetworkingService] Trying Eventbrite API (may have endpoint changes)');
     try {
       eventbriteEvents = await searchEventbriteEvents(keywords, location);
@@ -1441,8 +1942,14 @@ export async function getNetworkingEvents(
       console.error('[NetworkingService] Error fetching from Meraki API:', error);
     }
     
-    // Combine events, prioritizing Ticketmaster since it's currently working, then Eventbrite & Meraki
-    const allEvents = [...ticketmasterEvents, ...eventbriteEvents, ...merakiEvents];
+    // Combine all events from all sources with prioritization
+    const allEvents = [
+      ...ticketmasterEvents, 
+      ...googleEvents,
+      ...webScrapeEvents,
+      ...eventbriteEvents, 
+      ...merakiEvents
+    ];
     
     if (allEvents.length === 0) {
       console.warn('[NetworkingService] No events found from any source, generating personalized sample events');
@@ -1455,15 +1962,16 @@ export async function getNetworkingEvents(
       let careerFocus = 'general';
       
       // Determine primary career focus based on interests
-      if (careerInterests.some(i => i.toLowerCase().includes('human resource') || i.toLowerCase().includes('hr'))) {
+      const allInterests = [...interests, ...careers, ...skills];
+      if (allInterests.some(i => i.toLowerCase().includes('human resource') || i.toLowerCase().includes('hr'))) {
         careerFocus = 'hr';
-      } else if (careerInterests.some(i => i.toLowerCase().includes('health') || i.toLowerCase().includes('care'))) {
+      } else if (allInterests.some(i => i.toLowerCase().includes('health') || i.toLowerCase().includes('care'))) {
         careerFocus = 'healthcare';
-      } else if (careerInterests.some(i => i.toLowerCase().includes('tech') || i.toLowerCase().includes('software'))) {
+      } else if (allInterests.some(i => i.toLowerCase().includes('tech') || i.toLowerCase().includes('software'))) {
         careerFocus = 'tech';
-      } else if (careerInterests.some(i => i.toLowerCase().includes('design') || i.toLowerCase().includes('creative'))) {
+      } else if (allInterests.some(i => i.toLowerCase().includes('design') || i.toLowerCase().includes('creative'))) {
         careerFocus = 'design';
-      } else if (careerInterests.some(i => i.toLowerCase().includes('community') || i.toLowerCase().includes('social'))) {
+      } else if (allInterests.some(i => i.toLowerCase().includes('community') || i.toLowerCase().includes('social'))) {
         careerFocus = 'community';
       }
       
@@ -1684,7 +2192,7 @@ export async function getNetworkingEvents(
     // Add relevance scores based on user profile
     const scoredEvents = calculateRelevanceScores(
       allEvents,
-      careerInterests,
+      keywords,
       personalityType
     );
     
