@@ -605,10 +605,54 @@ export async function generateInternshipRecommendations(
     // Get a Gemini model instance
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     
-    // Extract career interests and strengths from quiz results
-    const primaryCareerType = quizResults?.primaryType?.name || "Unknown";
-    const secondaryCareerType = quizResults?.secondaryType?.name || "Unknown";
-    const careerOptions = quizResults?.primaryType?.careers || [];
+    // Extract career interests and strengths from quiz results with more comprehensive format support
+    let primaryCareerType = "Unknown";
+    let secondaryCareerType = "Unknown";
+    let careerOptions: string[] = [];
+    
+    // Extract primary type from various quiz result formats
+    if (quizResults?.primaryType) {
+      if (typeof quizResults.primaryType === 'string') {
+        primaryCareerType = quizResults.primaryType;
+      } else if (quizResults.primaryType.name) {
+        primaryCareerType = quizResults.primaryType.name;
+        
+        // Also extract career options if available
+        if (quizResults.primaryType.careers && Array.isArray(quizResults.primaryType.careers)) {
+          careerOptions = [...careerOptions, ...quizResults.primaryType.careers];
+        }
+      }
+    }
+    
+    // Extract secondary type from various quiz result formats  
+    if (quizResults?.secondaryType) {
+      if (typeof quizResults.secondaryType === 'string') {
+        secondaryCareerType = quizResults.secondaryType;
+      } else if (quizResults.secondaryType.name) {
+        secondaryCareerType = quizResults.secondaryType.name;
+        
+        // Also extract career options if available
+        if (quizResults.secondaryType.careers && Array.isArray(quizResults.secondaryType.careers)) {
+          careerOptions = [...careerOptions, ...quizResults.secondaryType.careers];
+        }
+      }
+    }
+    
+    // Extract from dominant/secondary types in older quiz format
+    if (quizResults?.dominantType && primaryCareerType === "Unknown") {
+      primaryCareerType = quizResults.dominantType;
+    }
+    
+    // Get hybrid careers if available
+    if (quizResults?.hybridCareers && Array.isArray(quizResults.hybridCareers)) {
+      careerOptions = [...careerOptions, ...quizResults.hybridCareers];
+    }
+    
+    console.log('Extracted for AI analysis:', { 
+      primaryCareerType, 
+      secondaryCareerType, 
+      careerOptionsCount: careerOptions.length 
+    });
     
     // Combine interests from both profile and quiz
     const interests = [

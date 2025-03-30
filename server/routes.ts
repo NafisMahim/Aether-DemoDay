@@ -156,16 +156,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Enhanced validation for quiz results to support multiple formats
       let primaryType: string = '';
+      let careerOptions: string[] = [];
       
       if (quizResults) {
+        // Extract primary type from various quiz result formats
         if (quizResults.primaryType) {
           if (typeof quizResults.primaryType === 'string') {
             primaryType = quizResults.primaryType;
           } else if (quizResults.primaryType.name) {
             primaryType = quizResults.primaryType.name;
+            
+            // Also extract career options if available
+            if (quizResults.primaryType.careers && Array.isArray(quizResults.primaryType.careers)) {
+              careerOptions = quizResults.primaryType.careers;
+            }
           }
         } else if (quizResults.dominantType) {
           primaryType = quizResults.dominantType;
+        } else if (quizResults.personality) {
+          // Extract from personality object (find highest scoring trait)
+          const personalityTraits = Object.entries(quizResults.personality);
+          if (personalityTraits.length > 0) {
+            const highestTrait = personalityTraits.reduce(
+              (highest, current) => current[1] > highest[1] ? current : highest,
+              ['', 0]
+            );
+            if (highestTrait[0]) {
+              primaryType = highestTrait[0].charAt(0).toUpperCase() + highestTrait[0].slice(1);
+            }
+          }
+        }
+        
+        // Also check if we have hybrid careers directly
+        if (quizResults.hybridCareers && Array.isArray(quizResults.hybridCareers)) {
+          careerOptions = [...careerOptions, ...quizResults.hybridCareers];
         }
       }
       
@@ -174,6 +198,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           success: false,
           message: "Quiz results are missing or don't contain a primary personality type"
         });
+      }
+      
+      console.log('Extracted primary type:', primaryType);
+      if (careerOptions.length > 0) {
+        console.log('Extracted career options:', careerOptions);
       }
       
       console.log('Starting internship matching with AI for personality type:', primaryType);

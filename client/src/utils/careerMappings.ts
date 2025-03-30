@@ -114,17 +114,65 @@ export function matchQuizResultsToCategories(quizResults: any): string[] {
     if (typeof quizResults.primaryType === 'string') {
       categories.add(quizResults.primaryType);
     } else if (quizResults.primaryType.name) {
+      // Add the primary type name
       categories.add(quizResults.primaryType.name);
       
       // Also add careers from primaryType if available
       if (quizResults.primaryType.careers && Array.isArray(quizResults.primaryType.careers)) {
+        // First directly add the careers as categories if they match our known categories
         quizResults.primaryType.careers.forEach((career: string) => {
-          Object.keys(interestToCareerMap).forEach(category => {
-            if (career.toLowerCase().includes(category.toLowerCase()) ||
-                category.toLowerCase().includes(career.toLowerCase())) {
+          // Exact match check
+          if (Object.keys(interestToCareerMap).includes(career)) {
+            categories.add(career);
+          } else {
+            // Partial match check
+            Object.keys(interestToCareerMap).forEach(category => {
+              if (career.toLowerCase().includes(category.toLowerCase()) ||
+                  category.toLowerCase().includes(career.toLowerCase())) {
+                categories.add(category);
+              }
+            });
+          }
+        });
+        
+        // Additionally, match with personalityToCareerMap for better job title selection
+        quizResults.primaryType.careers.forEach((career: string) => {
+          Object.entries(personalityToCareerMap).forEach(([category, mapping]) => {
+            // Check if the career matches any of the keywords
+            if (mapping.keywords.some(keyword => 
+              career.toLowerCase().includes(keyword.toLowerCase()) ||
+              keyword.toLowerCase().includes(career.toLowerCase())
+            )) {
               categories.add(category);
             }
           });
+        });
+      }
+    }
+  }
+  
+  // Also check secondary type if available
+  if (quizResults && quizResults.secondaryType) {
+    if (typeof quizResults.secondaryType === 'string') {
+      categories.add(quizResults.secondaryType);
+    } else if (quizResults.secondaryType.name) {
+      categories.add(quizResults.secondaryType.name);
+      
+      // Also add careers from secondaryType if available
+      if (quizResults.secondaryType.careers && Array.isArray(quizResults.secondaryType.careers)) {
+        quizResults.secondaryType.careers.forEach((career: string) => {
+          // Direct matches first
+          if (Object.keys(interestToCareerMap).includes(career)) {
+            categories.add(career);
+          } else {
+            // Then partial matches
+            Object.keys(interestToCareerMap).forEach(category => {
+              if (career.toLowerCase().includes(category.toLowerCase()) ||
+                  category.toLowerCase().includes(career.toLowerCase())) {
+                categories.add(category);
+              }
+            });
+          }
         });
       }
     }

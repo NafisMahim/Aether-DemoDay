@@ -136,9 +136,21 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
     
     // Based on personality type and career interests, generate relevant suggestions
     // Ensure personality type is a string
-    const personalityType = hasQuizResults 
-      ? String(quizResults.personalityType || quizResults.primaryType || "")
-      : "Professional"
+    let personalityType = "Professional"
+    
+    if (hasQuizResults) {
+      if (quizResults.personalityType) {
+        personalityType = String(quizResults.personalityType)
+      } else if (quizResults.primaryType) {
+        if (typeof quizResults.primaryType === 'string') {
+          personalityType = quizResults.primaryType
+        } else if (quizResults.primaryType && quizResults.primaryType.name) {
+          personalityType = quizResults.primaryType.name
+        }
+      } else if (quizResults.dominantType) {
+        personalityType = String(quizResults.dominantType)
+      }
+    }
     
     const strengths = hasQuizResults && quizResults.strengths 
       ? Array.isArray(quizResults.strengths) 
