@@ -5,6 +5,8 @@ dotenv.config();
 
 // API keys from environment variables (also hardcoded as fallback as requested by user)
 const EVENTBRITE_TOKEN = process.env.EVENTBRITE_TOKEN || 'DSBQW62GEUQM7ONFQ5K5';
+const EVENTBRITE_APP_KEY = process.env.EVENTBRITE_APP_KEY || 'GLDXQTI423FDOGWKIX'; 
+const EVENTBRITE_USER_ID = process.env.EVENTBRITE_USER_ID || '2703283588001';
 const TICKETMASTER_KEY = process.env.TICKETMASTER_KEY || 'buoqK3RrRD1tk73Uquh3JRtSLFeOG9Zp';
 
 // Interfaces for event data
@@ -142,17 +144,36 @@ export async function searchEventbriteEvents(
   location?: string
 ): Promise<NetworkingEvent[]> {
   try {
-    // Join keywords for the search query
-    const query = interestKeywords.join(' OR ');
+    // Try to get user information first
+    console.log(`[Eventbrite] Attempting to verify user authentication...`);
     
-    // Base URL for Eventbrite API
-    let url = `https://www.eventbriteapi.com/v3/events/search/?q=${encodeURIComponent(query)}&expand=venue`;
-    
-    // Add location parameter if provided
-    if (location) {
-      url += `&location.address=${encodeURIComponent(location)}`;
+    // First, verify the authentication by getting user data
+    let userResponse;
+    try {
+      const userUrl = `https://www.eventbriteapi.com/v3/users/me/?token=${EVENTBRITE_TOKEN}`;
+      console.log(`[Eventbrite] Getting user info with URL: ${userUrl.replace(EVENTBRITE_TOKEN, '***')}`);
+      
+      userResponse = await axios.get(userUrl, {
+        validateStatus: (status) => status < 500,
+      });
+      
+      console.log(`[Eventbrite] User info status: ${userResponse.status}`);
+      
+      if (userResponse.data && userResponse.data.error) {
+        console.error(`[Eventbrite] User info error: ${userResponse.data.error} - ${userResponse.data.error_description}`);
+        return [];
+      }
+    } catch (error) {
+      console.error('[Eventbrite] Error fetching user info:', error);
+      return [];
     }
     
+    // Now try to search for events
+    // Approach 1: search by organizer (more likely to find events)
+    const organizerId = EVENTBRITE_USER_ID; // Using the provided user ID
+    let url = `https://www.eventbriteapi.com/v3/organizers/${organizerId}/events/`;
+    
+    // Try to find public events for this user
     console.log(`[Eventbrite] Attempting to fetch events with URL: ${url}`);
     
     // Make API request to Eventbrite
@@ -166,46 +187,41 @@ export async function searchEventbriteEvents(
     // Check if the response contains an error
     if (response.data && response.data.error) {
       console.error(`[Eventbrite] API Error: ${response.data.error} - ${response.data.error_description}`);
+      
+      // Try alternative approach - get events by user directly
+      try {
+        const altUrl = `https://www.eventbriteapi.com/v3/users/${EVENTBRITE_USER_ID}/owned_events/`;
+        console.log(`[Eventbrite] Trying alternative URL: ${altUrl}`);
+        
+        const altResponse = await axios.get(altUrl, {
+          headers: {
+            'Authorization': `Bearer ${EVENTBRITE_TOKEN}`
+          },
+          validateStatus: (status) => status < 500,
+        });
+        
+        if (altResponse.data && altResponse.data.error) {
+          console.error(`[Eventbrite] Alternative API Error: ${altResponse.data.error} - ${altResponse.data.error_description}`);
+          return [];
+        }
+        
+        // Process events from alternative approach
+        if (altResponse.data && altResponse.data.events && Array.isArray(altResponse.data.events)) {
+          console.log(`[Eventbrite] Successfully fetched ${altResponse.data.events.length} events via alternative URL`);
+          return processEventbriteEvents(altResponse.data.events);
+        }
+      } catch (altError) {
+        console.error('[Eventbrite] Error with alternative approach:', altError);
+        return [];
+      }
+      
       return [];
     }
     
     // Map Eventbrite events to standardized format
     if (response.data && response.data.events && Array.isArray(response.data.events)) {
       console.log(`[Eventbrite] Successfully fetched ${response.data.events.length} events`);
-      return response.data.events.map((event: EventbriteEvent) => {
-        // Determine event type based on Eventbrite category (simplified)
-        let type: NetworkingEvent['type'] = "other";
-        
-        // Set default categories
-        const categories: string[] = [];
-        
-        // Extract time information
-        const dateObj = event.start ? new Date(event.start.local) : new Date();
-        const date = dateObj.toISOString().split('T')[0];
-        const time = event.start ? event.start.local.split('T')[1].substring(0, 5) : undefined;
-        
-        // Map to standardized event format
-        return {
-          id: event.id,
-          title: event.name.text,
-          description: event.description ? event.description.text.substring(0, 200) + '...' : 'No description available',
-          date,
-          time,
-          venue: event.venue?.name,
-          location: event.venue?.address ? 
-            [
-              event.venue.address.address_1,
-              event.venue.address.address_2
-            ].filter(Boolean).join(', ') : undefined,
-          city: event.venue?.address?.city,
-          state: event.venue?.address?.region,
-          country: event.venue?.address?.country,
-          url: event.url,
-          type,
-          categories,
-          source: "eventbrite"
-        };
-      });
+      return processEventbriteEvents(response.data.events);
     }
     
     return [];
@@ -213,6 +229,44 @@ export async function searchEventbriteEvents(
     console.error('Error fetching Eventbrite events:', error);
     return [];
   }
+}
+
+// Helper function to process Eventbrite events
+function processEventbriteEvents(events: EventbriteEvent[]): NetworkingEvent[] {
+  return events.map((event: EventbriteEvent) => {
+    // Determine event type based on Eventbrite category (simplified)
+    let type: NetworkingEvent['type'] = "other";
+    
+    // Set default categories
+    const categories: string[] = [];
+    
+    // Extract time information
+    const dateObj = event.start ? new Date(event.start.local) : new Date();
+    const date = dateObj.toISOString().split('T')[0];
+    const time = event.start ? event.start.local.split('T')[1].substring(0, 5) : undefined;
+    
+    // Map to standardized event format
+    return {
+      id: event.id,
+      title: event.name.text,
+      description: event.description ? event.description.text.substring(0, 200) + '...' : 'No description available',
+      date,
+      time,
+      venue: event.venue?.name,
+      location: event.venue?.address ? 
+        [
+          event.venue.address.address_1,
+          event.venue.address.address_2
+        ].filter(Boolean).join(', ') : undefined,
+      city: event.venue?.address?.city,
+      state: event.venue?.address?.region,
+      country: event.venue?.address?.country,
+      url: event.url,
+      type,
+      categories,
+      source: "eventbrite"
+    };
+  });
 }
 
 /**
