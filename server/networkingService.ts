@@ -1,5 +1,5 @@
 import axios from 'axios';
-import dotenv from 'dotenv';
+import * as dotenv from 'dotenv';
 
 dotenv.config();
 
@@ -301,45 +301,53 @@ export async function searchEventbriteEvents(
       }
     }
     
-    // APPROACH 3: Try to find events by category
+    // APPROACH 3: Direct search using the events search endpoint
     if (allEvents.length === 0) {
       try {
-        console.log('[Eventbrite] Trying to find events by category');
+        console.log('[Eventbrite] Trying direct search using the events/search endpoint');
         
-        // Categories: 101 = Business, 102 = Science & Tech
-        const categoryIds = ['101', '102'];
+        // Set up search parameters as shown in your example
+        // This approach is much more direct and effective
+        const searchParams: Record<string, string> = {
+          'q': filteredInterests.join(' ') || 'networking professional',
+          'start_date.range_start': new Date().toISOString().split('T')[0],
+          'expand': 'venue',
+          'sort_by': 'date'
+        };
         
-        for (const categoryId of categoryIds) {
-          try {
-            // Get featured events in this category
-            const categoryUrl = `https://www.eventbriteapi.com/v3/categories/${categoryId}/events/`;
-            
-            const categoryResponse = await axios.get(categoryUrl, {
-              headers,
-              timeout: 10000,
-              params: {
-                'status': 'live',
-                'start_date.range_start': new Date().toISOString().split('T')[0],
-                'expand': 'venue'
-              },
-              validateStatus: (status) => status < 500
-            });
-            
-            if (categoryResponse.status === 200 && 
-                categoryResponse.data && 
-                categoryResponse.data.events) {
-              console.log(`[Eventbrite] Found ${categoryResponse.data.events.length} events for category ${categoryId}`);
-              allEvents = [...allEvents, ...categoryResponse.data.events];
-            }
-          } catch (categoryError) {
-            console.error(`[Eventbrite] Error fetching events for category ${categoryId}:`, categoryError);
-          }
-          
-          // Add a delay between requests
-          await new Promise(resolve => setTimeout(resolve, 500));
+        // Add location parameter if provided
+        if (location) {
+          searchParams['location.address'] = location;
         }
-      } catch (categorySearchError) {
-        console.error('[Eventbrite] Error searching categories:', categorySearchError);
+        
+        // Also search for online events
+        searchParams['online_event'] = 'true';
+        
+        console.log('[Eventbrite] Search parameters:', searchParams);
+        
+        // Use the direct search endpoint
+        const searchUrl = 'https://www.eventbriteapi.com/v3/events/search/';
+        
+        const searchResponse = await axios.get(searchUrl, {
+          headers,
+          timeout: 15000,
+          params: searchParams,
+          validateStatus: (status) => status < 500
+        });
+        
+        if (searchResponse.status === 200 && 
+            searchResponse.data && 
+            searchResponse.data.events && 
+            Array.isArray(searchResponse.data.events)) {
+          console.log(`[Eventbrite] Direct search found ${searchResponse.data.events.length} events`);
+          allEvents = [...allEvents, ...searchResponse.data.events];
+        } else {
+          console.log('[Eventbrite] Direct search returned no events or invalid response');
+          console.log('[Eventbrite] Response status:', searchResponse.status);
+        }
+      } catch (error) {
+        const searchError: any = error;
+        console.error('[Eventbrite] Error with direct search:', searchError.message);
       }
     }
     
@@ -347,6 +355,38 @@ export async function searchEventbriteEvents(
     if (allEvents.length > 0) {
       console.log(`[Eventbrite] Total events found: ${allEvents.length}`);
       return processEventbriteEvents(allEvents);
+    }
+    
+    // APPROACH 4: Try using token directly in URL (alternative authentication method)
+    if (allEvents.length === 0) {
+      try {
+        console.log('[Eventbrite] Trying token-in-URL approach as fallback');
+        
+        // Using the approach you suggested with token directly in URL
+        const directUrl = `https://www.eventbriteapi.com/v3/events/search/?token=${EVENTBRITE_TOKEN}&q=${encodeURIComponent(filteredInterests.join(' ') || 'networking')}&start_date.range_start=${new Date().toISOString().split('T')[0]}`;
+        
+        // Log sanitized URL (hiding token)
+        console.log('[Eventbrite] Using direct URL approach (token hidden)');
+        
+        const directResponse = await axios.get(directUrl, {
+          timeout: 15000,
+          validateStatus: (status) => status < 500
+        });
+        
+        if (directResponse.status === 200 && 
+            directResponse.data && 
+            directResponse.data.events && 
+            Array.isArray(directResponse.data.events)) {
+          console.log(`[Eventbrite] Token-in-URL approach found ${directResponse.data.events.length} events`);
+          allEvents = [...allEvents, ...directResponse.data.events];
+        } else {
+          console.log('[Eventbrite] Token-in-URL approach returned no events or invalid response');
+          console.log('[Eventbrite] Response status:', directResponse.status);
+        }
+      } catch (error) {
+        const directError: any = error;
+        console.error('[Eventbrite] Error with token-in-URL approach:', directError.message);
+      }
     }
     
     // Try one more fallback - use orders endpoint to get order IDs, then fetch event details
