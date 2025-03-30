@@ -4,18 +4,25 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // API keys from environment variables
-const EVENTBRITE_TOKEN = process.env.EVENTBRITE_TOKEN || 'DSBQW62GEUQM7ONFQ5K5';
-const EVENTBRITE_APP_KEY = process.env.EVENTBRITE_APP_KEY || 'GLDXQTI423FDOGWKIX'; 
-const EVENTBRITE_USER_ID = process.env.EVENTBRITE_USER_ID || '2703283588001';
+const EVENTBRITE_TOKEN = process.env.EVENTBRITE_TOKEN;
+const EVENTBRITE_APP_KEY = process.env.EVENTBRITE_APP_KEY;
+const EVENTBRITE_USER_ID = process.env.EVENTBRITE_USER_ID;
 
 // Ticketmaster credentials from environment variables
-const TICKETMASTER_KEY = process.env.TICKETMASTER_KEY; // Using real API key from environment
-const TICKETMASTER_SECRET = process.env.TICKETMASTER_SECRET; // Using real API secret from environment
+const TICKETMASTER_KEY = process.env.TICKETMASTER_KEY;
+const TICKETMASTER_SECRET = process.env.TICKETMASTER_SECRET;
 
 // For debugging
-console.log('[NetworkingService] Ticketmaster credentials available:', {
-  keyAvailable: !!TICKETMASTER_KEY,
-  secretAvailable: !!TICKETMASTER_SECRET
+console.log('[NetworkingService] API credentials available:', {
+  eventbrite: {
+    tokenAvailable: !!EVENTBRITE_TOKEN,
+    userIdAvailable: !!EVENTBRITE_USER_ID,
+    appKeyAvailable: !!EVENTBRITE_APP_KEY
+  },
+  ticketmaster: {
+    keyAvailable: !!TICKETMASTER_KEY,
+    secretAvailable: !!TICKETMASTER_SECRET
+  }
 });
 
 // Interfaces for event data
@@ -137,7 +144,7 @@ export interface NetworkingEvent {
   url: string;
   type: "conference" | "workshop" | "meetup" | "concert" | "sporting" | "networking" | "other";
   categories: string[];
-  source: "eventbrite" | "ticketmaster";
+  source: "eventbrite" | "ticketmaster" | "generated";
   image?: string;
   relevanceScore?: number;
 }
@@ -160,7 +167,7 @@ export async function searchEventbriteEvents(
     let userResponse;
     try {
       const userUrl = `https://www.eventbriteapi.com/v3/users/me/?token=${EVENTBRITE_TOKEN}`;
-      console.log(`[Eventbrite] Getting user info with URL: ${userUrl.replace(EVENTBRITE_TOKEN, '***')}`);
+      console.log(`[Eventbrite] Getting user info with URL: ${userUrl.replace(EVENTBRITE_TOKEN || '', '***')}`);
       
       userResponse = await axios.get(userUrl, {
         validateStatus: (status) => status < 500,
@@ -672,16 +679,32 @@ export async function getNetworkingEvents(
     
     console.log(`[NetworkingService] Generated search keywords: ${keywords.join(', ')}`);
     
-    // Fetch events from both APIs in parallel
-    const [eventbriteEvents, ticketmasterEvents] = await Promise.all([
-      searchEventbriteEvents(keywords, location),
-      searchTicketmasterEvents(keywords, location)
-    ]);
+    // First try Eventbrite since we now have credentials
+    console.log('[NetworkingService] Prioritizing Eventbrite API with newly added credentials');
+    let eventbriteEvents: NetworkingEvent[] = [];
     
-    console.log(`[NetworkingService] Eventbrite returned ${eventbriteEvents.length} events`);
-    console.log(`[NetworkingService] Ticketmaster returned ${ticketmasterEvents.length} events`);
+    try {
+      eventbriteEvents = await searchEventbriteEvents(keywords, location);
+      console.log(`[NetworkingService] Eventbrite returned ${eventbriteEvents.length} events`);
+    } catch (error) {
+      console.error('[NetworkingService] Error fetching from Eventbrite:', error);
+    }
     
-    // Combine events from both sources
+    // If we have enough Eventbrite events, we can skip Ticketmaster
+    let ticketmasterEvents: NetworkingEvent[] = [];
+    if (eventbriteEvents.length < 5) {
+      console.log('[NetworkingService] Not enough Eventbrite events, trying Ticketmaster as fallback');
+      try {
+        ticketmasterEvents = await searchTicketmasterEvents(keywords, location);
+        console.log(`[NetworkingService] Ticketmaster returned ${ticketmasterEvents.length} events`);
+      } catch (error) {
+        console.error('[NetworkingService] Error fetching from Ticketmaster:', error);
+      }
+    } else {
+      console.log('[NetworkingService] Sufficient Eventbrite events found, skipping Ticketmaster');
+    }
+    
+    // Combine events, prioritizing Eventbrite
     const allEvents = [...eventbriteEvents, ...ticketmasterEvents];
     
     if (allEvents.length === 0) {
