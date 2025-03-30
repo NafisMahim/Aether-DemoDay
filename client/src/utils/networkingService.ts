@@ -15,7 +15,7 @@ export interface NetworkingEvent {
   url: string;
   type: "conference" | "workshop" | "meetup" | "concert" | "sporting" | "networking" | "other";
   categories: string[];
-  source: "eventbrite" | "ticketmaster";
+  source: "eventbrite" | "ticketmaster" | "meraki" | "generated";
   image?: string;
   relevanceScore?: number;
 }

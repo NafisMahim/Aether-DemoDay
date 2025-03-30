@@ -552,6 +552,22 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
     }
   }
   
+  // Get source badge for different event sources
+  const getSourceBadge = (source: string) => {
+    switch (source) {
+      case 'eventbrite':
+        return <Badge variant="outline" className="text-xs bg-orange-50">Eventbrite</Badge>
+      case 'ticketmaster':
+        return <Badge variant="outline" className="text-xs bg-blue-50">Ticketmaster</Badge>
+      case 'meraki':
+        return <Badge variant="outline" className="text-xs bg-green-50">Meraki</Badge>
+      case 'generated':
+        return <Badge variant="outline" className="text-xs bg-purple-50">AI Recommended</Badge>
+      default:
+        return null
+    }
+  }
+  
   // Helper to get icon based on resume section type
   const getResumeSectionIcon = (type: string) => {
     switch (type) {
@@ -673,10 +689,11 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
                     </CardContent>
                     
                     <CardFooter className="flex items-center justify-between pt-2 pb-4">
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-2">
                         <span className="text-xs font-medium">
                           {opportunity.relevanceScore}%
                         </span>
+                        {opportunity.source && getSourceBadge(opportunity.source)}
                       </div>
                       
                       <div className="flex gap-2">
