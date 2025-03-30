@@ -16,7 +16,7 @@ const TICKETMASTER_SECRET = process.env.TICKETMASTER_SECRET;
 const MERAKI_API_KEY = process.env.MERAKI_API_KEY;
 
 // RapidAPI key for web scraping (for AI Web Scraper and other services)
-const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
+const RAPIDAPI_KEY = "3f9c2ecba6mshd1f47ab59b16e42p1e8991jsn055e3aba0a5a"; // Using provided key
 
 // Google Custom Search credentials
 const GOOGLE_CSE_ID = process.env.GOOGLE_CSE_ID; // Custom Search Engine ID
@@ -1571,7 +1571,9 @@ export async function searchWebScrapingForEvents(
   interestKeywords: string[],
   location?: string
 ): Promise<NetworkingEvent[]> {
-  if (!RAPIDAPI_KEY) {
+  // Using direct hard-coded key rather than environment variable
+  const apiKey = "3f9c2ecba6mshd1f47ab59b16e42p1e8991jsn055e3aba0a5a";
+  if (!apiKey) {
     console.error('[WebScrape] Missing RapidAPI key');
     return [];
   }
@@ -1584,12 +1586,10 @@ export async function searchWebScrapingForEvents(
       .filter(keyword => keyword.length < 40)
       .slice(0, 3);
     
-    // Target websites to scrape for events
+    // Target websites to scrape (using pre-defined URLs for popular event sites)
     const targetSites = [
-      'eventbrite.com/d/united-states--new-york/networking-events',
-      'meetup.com/find/?keywords=professional-networking',
-      'conferencealerts.com/topic-listing?topic=Business',
-      'eventbrite.com/d/united-states--new-york/business-events'
+      { name: 'Eventbrite', url: 'https://www.eventbrite.com/d/united-states--new-york/professional-events/' },
+      { name: 'Meetup', url: 'https://www.meetup.com/find/?keywords=professional-networking' }
     ];
     
     let allEvents: NetworkingEvent[] = [];
@@ -1599,39 +1599,41 @@ export async function searchWebScrapingForEvents(
       try {
         // Add delay between requests
         if (index > 0) {
-          await new Promise(resolve => setTimeout(resolve, 1500));
+          await new Promise(resolve => setTimeout(resolve, 2000));
         }
         
-        console.log(`[WebScrape] Scraping data from: ${site}`);
+        console.log(`[WebScrape] Scraping data from: ${site.name} (${site.url})`);
         
-        // Construct full URL with https
-        const url = `https://${site}`;
-        
-        // Setup headers for RapidAPI
-        const headers = {
-          'x-rapidapi-key': RAPIDAPI_KEY,
-          'x-rapidapi-host': 'ai-web-scraper.p.rapidapi.com',
-          'Content-Type': 'application/x-www-form-urlencoded'
+        // Using WebScrapingAPI from RapidAPI instead of AI Web Scraper
+        const options = {
+          method: 'GET',
+          url: 'https://webscrapingapi.com/site/proxy-api',
+          params: {
+            api_key: apiKey,
+            url: site.url,
+            device: 'desktop',
+            proxy_type: 'datacenter',
+            render_js: '1'
+          },
+          headers: {
+            'X-RapidAPI-Key': apiKey,
+            'X-RapidAPI-Host': 'webscrapingapi.p.rapidapi.com'
+          }
         };
         
-        // Make the request to RapidAPI
-        const response = await axios.post(
-          'https://ai-web-scraper.p.rapidapi.com/extract_content/v1', 
-          `url=${encodeURIComponent(url)}`, 
-          { headers }
-        );
+        const response = await axios.request(options);
         
-        if (!response.data || !response.data.extracted_content) {
-          console.log(`[WebScrape] No content extracted from ${site}`);
+        if (!response.data) {
+          console.log(`[WebScrape] No content extracted from ${site.name}`);
           continue;
         }
         
-        const content = response.data.extracted_content;
-        console.log(`[WebScrape] Successfully extracted content from ${site}`);
+        const content = response.data;
+        console.log(`[WebScrape] Successfully extracted content from ${site.name}`);
         
         // Process the scraped content to extract events
         const events = processScrapedContent(content, site, filteredKeywords);
-        console.log(`[WebScrape] Extracted ${events.length} events from ${site}`);
+        console.log(`[WebScrape] Extracted ${events.length} events from ${site.name}`);
         
         // Add to our collection
         allEvents = [...allEvents, ...events];
@@ -1642,7 +1644,7 @@ export async function searchWebScrapingForEvents(
           break;
         }
       } catch (siteError: any) {
-        console.error(`[WebScrape] Error processing ${site}:`, siteError.message);
+        console.error(`[WebScrape] Error processing ${site.name}:`, siteError.message);
       }
     }
     
@@ -1663,7 +1665,7 @@ export async function searchWebScrapingForEvents(
  */
 function processScrapedContent(
   content: string,
-  sourceSite: string,
+  sourceSite: { name: string; url: string },
   keywords: string[]
 ): NetworkingEvent[] {
   // Simple extraction logic to identify events in the content
@@ -1709,11 +1711,11 @@ function processScrapedContent(
     
     // Create event with available info
     events.push({
-      id: `webscrape-${sourceSite.split('.')[0]}-${index}-${Date.now()}`,
+      id: `webscrape-${sourceSite.name.toLowerCase()}-${index}-${Date.now()}`,
       title: title.length > 10 ? title : `Professional Networking Event #${index + 1}`,
       description: section.substring(0, 200) + '...',
       date,
-      url: `https://${sourceSite}`,
+      url: sourceSite.url,
       type: determineEventType(section),
       categories: determineEventCategories(section, keywords),
       industry: determineEventIndustry(section, keywords),
