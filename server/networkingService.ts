@@ -301,87 +301,95 @@ export async function searchTicketmasterEvents(
       !keyword.includes(".")
     );
     
-    // Focus on professional/career keywords from the list
-    const professionalKeywords = [
-      "business", "conference", "workshop", "networking", 
-      "professional", "career", "development", "training", 
-      "leadership", "management", "human resources", "hr", 
-      "community", "healthcare"
+    // Career-focused search strategies - from specific to general
+    const searchStrategies = [
+      // Strategy 1: Business and conference focus
+      {
+        keywords: "business,conference,professional",
+        size: 20
+      },
+      // Strategy 2: Workshop and training focus
+      {
+        keywords: "workshop,training,leadership",
+        size: 20
+      },
+      // Strategy 3: Networking specific
+      {
+        keywords: "networking,career,professional",
+        size: 20
+      },
+      // Strategy 4: Human resources
+      {
+        keywords: "human resources,career,management",
+        size: 20
+      },
+      // Strategy 5: General events (fallback)
+      {
+        keywords: "",
+        size: 30
+      }
     ];
     
-    // Combine with user interests but limit to prevent overly complex queries
-    const relevantKeywords = [
-      ...professionalKeywords,
-      ...filteredKeywords.slice(0, 3) // Take just a few user keywords
-    ];
+    // Attempt all strategies and collect results
+    let allEvents: TicketmasterEvent[] = [];
     
-    // Join keywords for the API query, picking the most relevant ones
-    const keywordString = relevantKeywords.slice(0, 5).join(",");
-    
-    try {
-      // Build URL with specific focus on career/networking keywords
-      console.log('[Ticketmaster] Making targeted API call for professional events');
-      const directUrl = `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${TICKETMASTER_KEY}&size=50&keyword=${encodeURIComponent(keywordString)}&sort=date,asc`;
-      
-      // Log sanitized URL
-      const sanitizedUrl = directUrl.replace(TICKETMASTER_KEY, '***');
-      console.log(`[Ticketmaster] Direct API URL: ${sanitizedUrl}`);
-      
-      // Make the request - no extra headers, just like curl
-      const response = await axios.get(directUrl);
-      
-      // Process the response
-      if (response.data && response.data._embedded && response.data._embedded.events) {
-        const allEvents = response.data._embedded.events;
-        console.log(`[Ticketmaster] Successfully fetched ${allEvents.length} events directly`);
+    // Try each search strategy in sequence until we get results
+    for (const [index, strategy] of searchStrategies.entries()) {
+      try {
+        // Build URL based on strategy
+        console.log(`[Ticketmaster] Trying search strategy ${index + 1}`);
         
-        // Pre-filter events to exclude obviously irrelevant ones
-        const filteredEvents = allEvents.filter((event: TicketmasterEvent) => {
-          // Skip sports events
-          if (event.classifications?.[0]?.segment?.name === 'Sports') {
-            return false;
-          }
-          
-          // Skip concerts and music events
-          if (event.classifications?.[0]?.segment?.name === 'Music') {
-            return false;
-          }
-          
-          // Skip entertainment events that aren't professional
-          const name = event.name?.toLowerCase() || '';
-          if (
-            (name.includes('game') || 
-             name.includes('concert') || 
-             name.includes('festival') || 
-             name.includes('championship')) && 
-            !name.includes('business') && 
-            !name.includes('career') && 
-            !name.includes('professional')
-          ) {
-            return false;
-          }
-          
-          return true;
+        // Build query parameters
+        const params = new URLSearchParams({
+          apikey: TICKETMASTER_KEY,
+          size: strategy.size.toString(),
+          sort: 'date,asc'
         });
         
-        console.log(`[Ticketmaster] Filtered down to ${filteredEvents.length} relevant professional events`);
+        // Add keywords if present
+        if (strategy.keywords) {
+          params.append('keyword', strategy.keywords);
+        }
         
-        // Process and return the filtered events
-        return processTicketmasterEvents(filteredEvents);
-      } else {
-        console.log('[Ticketmaster] No events found in direct API response');
-      }
-    } catch (directError: any) {
-      console.error(`[Ticketmaster] Direct API call failed: ${directError.message}`);
-      if (directError.response) {
-        console.error(`[Ticketmaster] Status: ${directError.response.status}`);
-        console.error(`[Ticketmaster] Data:`, directError.response.data);
+        const apiUrl = `https://app.ticketmaster.com/discovery/v2/events.json?${params.toString()}`;
+        
+        // Log sanitized URL
+        const sanitizedUrl = apiUrl.replace(TICKETMASTER_KEY, '***');
+        console.log(`[Ticketmaster] API URL: ${sanitizedUrl}`);
+        
+        // Make the request with timeout
+        const response = await axios.get(apiUrl, { timeout: 5000 });
+        
+        // Check for events
+        if (response.data && response.data._embedded && response.data._embedded.events) {
+          const events = response.data._embedded.events;
+          console.log(`[Ticketmaster] Strategy ${index + 1} found ${events.length} events`);
+          
+          // We got results, add them to our collection
+          allEvents = [...allEvents, ...events];
+          
+          // If we have enough events already, break early
+          if (allEvents.length >= 30) {
+            console.log('[Ticketmaster] Found enough events, stopping search');
+            break;
+          }
+        } else {
+          console.log(`[Ticketmaster] Strategy ${index + 1} found no events`);
+        }
+      } catch (strategyError: any) {
+        console.error(`[Ticketmaster] Strategy ${index + 1} failed: ${strategyError.message}`);
       }
     }
     
-    // If we get here, we couldn't get events through the API
-    console.log('[Ticketmaster] Could not retrieve events from Ticketmaster API');
-    return [];
+    console.log(`[Ticketmaster] Total events found across all strategies: ${allEvents.length}`);
+    
+    if (allEvents.length === 0) {
+      console.log('[Ticketmaster] No events found from any search strategy');
+      return [];
+    }
+    
+    // Process all events we found
+    return processTicketmasterEvents(allEvents);
   } catch (error) {
     console.error('Error fetching Ticketmaster events:', error);
     return [];
@@ -677,78 +685,240 @@ export async function getNetworkingEvents(
     const allEvents = [...eventbriteEvents, ...ticketmasterEvents];
     
     if (allEvents.length === 0) {
-      console.warn('[NetworkingService] No events found from any source, returning sample events');
-      // Return sample events when no real data is available
-      return [
-        {
-          id: "sample-tech-001",
-          title: "Tech Innovators Meetup",
-          description: "Monthly gathering of tech professionals discussing emerging technologies and industry trends.",
-          date: new Date().toISOString().split('T')[0], // Today's date
-          time: "18:00",
-          venue: "Tech Hub Downtown",
+      console.warn('[NetworkingService] No events found from any source, generating personalized sample events');
+      
+      // Create sample events tailored to the user's career profile
+      const sampleEvents: NetworkingEvent[] = [];
+      
+      // Base each sample on the user's personality and career interests
+      const personality = personalityType.toLowerCase();
+      let careerFocus = 'general';
+      
+      // Determine primary career focus based on interests
+      if (careerInterests.some(i => i.toLowerCase().includes('human resource') || i.toLowerCase().includes('hr'))) {
+        careerFocus = 'hr';
+      } else if (careerInterests.some(i => i.toLowerCase().includes('health') || i.toLowerCase().includes('care'))) {
+        careerFocus = 'healthcare';
+      } else if (careerInterests.some(i => i.toLowerCase().includes('tech') || i.toLowerCase().includes('software'))) {
+        careerFocus = 'tech';
+      } else if (careerInterests.some(i => i.toLowerCase().includes('design') || i.toLowerCase().includes('creative'))) {
+        careerFocus = 'design';
+      } else if (careerInterests.some(i => i.toLowerCase().includes('community') || i.toLowerCase().includes('social'))) {
+        careerFocus = 'community';
+      }
+      
+      console.log(`[NetworkingService] Generating sample events focused on: ${careerFocus}`);
+      
+      // Based on career focus, generate tailored sample events
+      switch (careerFocus) {
+        case 'hr':
+          sampleEvents.push({
+            id: "sample-hr-001",
+            title: "HR Leadership & Innovation Conference",
+            description: "Connect with HR professionals and learn about the latest trends in talent management, employee experience, and organizational development. Featuring workshops on diversity & inclusion strategies and effective change management.",
+            date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            time: "09:00",
+            venue: "Professional Development Center",
+            city: "Chicago",
+            state: "IL",
+            country: "USA",
+            url: "https://example.com/events/hr-leadership",
+            type: "conference",
+            categories: ["Human Resources", "Leadership", "Professional Development"],
+            source: "generated",
+            relevanceScore: 95,
+            image: "https://images.unsplash.com/photo-1515187029135-18ee286d815b?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80"
+          });
+          sampleEvents.push({
+            id: "sample-hr-002",
+            title: "Diversity & Inclusion Workshop Series",
+            description: "A comprehensive workshop series focusing on implementing effective diversity and inclusion strategies in the workplace. Includes practical sessions on building inclusive recruitment processes and fostering belonging.",
+            date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            time: "10:00",
+            venue: "Executive Training Center",
+            city: "New York",
+            state: "NY",
+            country: "USA",
+            url: "https://example.com/events/diversity-inclusion-workshop",
+            type: "workshop",
+            categories: ["Human Resources", "Diversity & Inclusion", "Professional Development"],
+            source: "generated",
+            relevanceScore: 92,
+            image: "https://images.unsplash.com/photo-1573164713988-8665fc963095?ixlib=rb-4.0.3&auto=format&fit=crop&w=1169&q=80"
+          });
+          break;
+          
+        case 'healthcare':
+          sampleEvents.push({
+            id: "sample-health-001",
+            title: "Healthcare Program Management Summit",
+            description: "Annual conference for healthcare administrators and program managers focusing on improving patient care systems, healthcare operations efficiency, and innovative management approaches in medical settings.",
+            date: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            time: "08:30",
+            venue: "Medical Center Conference Hall",
+            city: "Boston",
+            state: "MA",
+            country: "USA",
+            url: "https://example.com/events/healthcare-management-summit",
+            type: "conference",
+            categories: ["Healthcare", "Management", "Professional Development"],
+            source: "generated",
+            relevanceScore: 94,
+            image: "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80"
+          });
+          sampleEvents.push({
+            id: "sample-health-002",
+            title: "Healthcare Leadership Networking Event",
+            description: "Monthly networking event connecting healthcare professionals in leadership and administrative roles. Share best practices, discuss industry challenges, and build valuable professional relationships.",
+            date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            time: "18:00",
+            venue: "City Medical Association",
+            city: "San Francisco",
+            state: "CA",
+            country: "USA",
+            url: "https://example.com/events/healthcare-networking",
+            type: "networking",
+            categories: ["Healthcare", "Leadership", "Networking"],
+            source: "generated",
+            relevanceScore: 91,
+            image: "https://images.unsplash.com/photo-1576091160550-2173dba999ef?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80"
+          });
+          break;
+          
+        case 'community':
+          sampleEvents.push({
+            id: "sample-community-001",
+            title: "Community Operations Managers Conference",
+            description: "The premier conference for community operations professionals focusing on building sustainable community programs, measuring impact, and developing effective engagement strategies.",
+            date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            time: "09:30",
+            venue: "Community Center",
+            city: "Portland",
+            state: "OR",
+            country: "USA",
+            url: "https://example.com/events/community-operations",
+            type: "conference",
+            categories: ["Community Management", "Operations", "Engagement"],
+            source: "generated",
+            relevanceScore: 93,
+            image: "https://images.unsplash.com/photo-1544531585-9847b68c8c86?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80"
+          });
+          sampleEvents.push({
+            id: "sample-community-002",
+            title: "Social Impact Leadership Forum",
+            description: "Connect with professionals focused on creating social impact through effective community programs, non-profit management, and human-centered program design.",
+            date: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            time: "13:00",
+            venue: "Civic Engagement Center",
+            city: "Seattle",
+            state: "WA",
+            country: "USA",
+            url: "https://example.com/events/social-impact-forum",
+            type: "networking",
+            categories: ["Social Impact", "Community", "Leadership"],
+            source: "generated",
+            relevanceScore: 90,
+            image: "https://images.unsplash.com/photo-1559024094-4a0b775234e9?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80"
+          });
+          break;
+          
+        default:
+          // General professional events for all careers
+          sampleEvents.push({
+            id: "sample-prof-001",
+            title: "Professional Development & Leadership Summit",
+            description: "Comprehensive summit featuring expert speakers on career advancement, leadership skills, and professional relationship building. Includes workshops on effective communication and team management.",
+            date: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            time: "09:00",
+            venue: "Business Conference Center",
+            city: "Chicago",
+            state: "IL",
+            country: "USA",
+            url: "https://example.com/events/professional-development-summit",
+            type: "conference",
+            categories: ["Professional Development", "Leadership", "Career Advancement"],
+            source: "generated",
+            relevanceScore: 89,
+            image: "https://images.unsplash.com/photo-1507537297725-24a1c029d3ca?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80"
+          });
+          sampleEvents.push({
+            id: "sample-prof-002",
+            title: "Career Networking Masterclass",
+            description: "Learn the art of effective professional networking in this interactive masterclass. Develop strategies for building meaningful connections, maintaining professional relationships, and leveraging your network for career growth.",
+            date: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            time: "18:00",
+            venue: "Professional Development Institute",
+            city: "New York",
+            state: "NY",
+            country: "USA",
+            url: "https://example.com/events/networking-masterclass",
+            type: "workshop",
+            categories: ["Career Development", "Networking", "Professional Skills"],
+            source: "generated",
+            relevanceScore: 87,
+            image: "https://images.unsplash.com/photo-1556761175-b413da4baf72?ixlib=rb-4.0.3&auto=format&fit=crop&w=1074&q=80"
+          });
+      }
+      
+      // Add a personality-specific event
+      if (personality.includes('social')) {
+        sampleEvents.push({
+          id: "sample-social-001",
+          title: "Building Relationships: Social Intelligence in the Workplace",
+          description: "Workshop designed for socially-oriented professionals looking to leverage their interpersonal strengths in professional settings. Learn to enhance team dynamics, improve communication, and build stronger workplace relationships.",
+          date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          time: "10:00",
+          venue: "Professional Development Center",
           city: "San Francisco",
           state: "CA",
           country: "USA",
-          url: "https://example.com/events/tech-innovators",
-          type: "conference",
-          categories: ["Technology", "Innovation", "Networking"],
-          source: "ticketmaster",
-          relevanceScore: 92,
-          image: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80"
-        },
-        {
-          id: "sample-design-002",
-          title: "Women in Design Community",
-          description: "Supportive community for women in design to share resources, mentorship, and job opportunities.",
-          date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // A week from now
-          time: "17:30",
-          venue: "Design Studio Loft",
-          city: "New York",
-          state: "NY",
-          country: "USA",
-          url: "https://example.com/events/women-design",
-          type: "networking",
-          categories: ["Design", "Community", "Mentorship"],
-          source: "ticketmaster",
-          relevanceScore: 85,
-          image: "https://images.unsplash.com/photo-1543269865-cbf427effbad?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80"
-        },
-        {
-          id: "sample-health-003",
-          title: "Healthcare Innovation Summit",
-          description: "Annual conference for healthcare professionals to explore new technologies and practices that improve patient care.",
-          date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Two weeks from now
+          url: "https://example.com/events/social-intelligence-workshop",
+          type: "workshop",
+          categories: ["Interpersonal Skills", "Communication", "Team Building"],
+          source: "generated",
+          relevanceScore: 96,
+          image: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80"
+        });
+      } else if (personality.includes('analytical')) {
+        sampleEvents.push({
+          id: "sample-analytical-001",
+          title: "Data-Driven Decision Making Conference",
+          description: "Conference focused on using analytical approaches to solve business problems and make strategic decisions. Includes workshops on data analysis, critical thinking, and implementing evidence-based strategies.",
+          date: new Date(Date.now() + 9 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           time: "09:00",
-          venue: "Medical Center Conference Hall",
+          venue: "Technology Innovation Center",
           city: "Boston",
           state: "MA",
           country: "USA",
-          url: "https://example.com/events/healthcare-summit",
+          url: "https://example.com/events/analytical-conference",
           type: "conference",
-          categories: ["Healthcare", "Innovation", "Professional Development"],
-          source: "ticketmaster",
-          relevanceScore: 88,
-          image: "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80"
-        },
-        {
-          id: "sample-hr-004",
-          title: "HR Leadership Conference",
-          description: "Connect with HR professionals and learn about the latest trends in talent management and employee experience.",
-          date: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Three weeks from now
-          time: "10:00",
-          venue: "Business Convention Center",
-          city: "Chicago",
-          state: "IL",
-          country: "USA",
-          url: "https://example.com/events/hr-leadership",
-          type: "conference",
-          categories: ["Human Resources", "Leadership", "Professional Development"],
-          source: "ticketmaster",
-          relevanceScore: 95,
-          image: "https://images.unsplash.com/photo-1515187029135-18ee286d815b?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80"
-        }
-      ];
+          categories: ["Data Analysis", "Critical Thinking", "Decision Making"],
+          source: "generated",
+          relevanceScore: 90,
+          image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80"
+        });
+      }
+      
+      // Add a general career networking event
+      sampleEvents.push({
+        id: "sample-career-001",
+        title: "Professional Networking Mixer",
+        description: "Monthly networking event bringing together professionals from various industries for meaningful connections and conversation. Perfect opportunity to expand your professional network in a relaxed setting.",
+        date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        time: "18:30",
+        venue: "Metropolitan Business Club",
+        city: "New York",
+        state: "NY",
+        country: "USA",
+        url: "https://example.com/events/professional-mixer",
+        type: "networking",
+        categories: ["Networking", "Professional Development", "Career"],
+        source: "generated",
+        relevanceScore: 88,
+        image: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80"
+      });
+      
+      return sampleEvents;
     }
     
     // Add relevance scores based on user profile
