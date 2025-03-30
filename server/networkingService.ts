@@ -2397,14 +2397,8 @@ export async function getNetworkingEvents(
       console.error('[NetworkingService] Error fetching from Eventbrite:', error);
     }
     
-    // Try using Meraki API as additional source
-    console.log('[NetworkingService] Trying Meraki API for additional networking events');
-    try {
-      merakiEvents = await searchMerakiEvents(keywords, location);
-      console.log(`[NetworkingService] Meraki API returned ${merakiEvents.length} events`);
-    } catch (error) {
-      console.error('[NetworkingService] Error fetching from Meraki API:', error);
-    }
+    // Removed Meraki API integration as requested by user
+    merakiEvents = [];
     
     // Try using PredictHQ API as a new reliable source
     console.log('[NetworkingService] Trying PredictHQ API for professional events');
@@ -2415,14 +2409,14 @@ export async function getNetworkingEvents(
       console.error('[NetworkingService] Error fetching from PredictHQ API:', error);
     }
     
-    // Combine all events from all sources with prioritization
+    // Combine all events from all sources with prioritization (excluding Meraki)
     const allEvents = [
       ...predictHQEvents, // Prioritize PredictHQ events as they're more reliable and business-focused
       ...ticketmasterEvents, 
       ...googleEvents,
       ...webScrapeEvents,
-      ...eventbriteEvents, 
-      ...merakiEvents
+      ...eventbriteEvents
+      // Meraki events removed as requested
     ];
     
     if (allEvents.length === 0) {

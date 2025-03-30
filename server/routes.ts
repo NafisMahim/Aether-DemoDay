@@ -1528,15 +1528,16 @@ Now, please respond to this user message: ${message}`;
       const predictHQCount = events.filter(e => e.source === 'predicthq').length;
       const googleCount = events.filter(e => e.source === 'google').length;
       const webscrapeCount = events.filter(e => e.source === 'webscrape').length;
-      const merakiCount = events.filter(e => e.source === 'meraki').length;
+      // Meraki API removed per user request
+      const merakiCount = 0; // Set to 0 since Meraki API is removed
       
       const apiStatus = {
         eventbrite: eventbriteCount > 0 ? 'available' : 'unavailable',
         ticketmaster: ticketmasterCount > 0 ? 'available' : 'unavailable',
         predicthq: predictHQCount > 0 ? 'available' : 'unavailable',
         google: googleCount > 0 ? 'available' : 'unavailable',
-        webscrape: webscrapeCount > 0 ? 'available' : 'unavailable',
-        meraki: merakiCount > 0 ? 'available' : 'unavailable'
+        webscrape: webscrapeCount > 0 ? 'available' : 'unavailable'
+        // Meraki removed as requested
       };
       
       return res.status(200).json({
@@ -1549,8 +1550,8 @@ Now, please respond to this user message: ${message}`;
           ticketmaster: ticketmasterCount,
           predicthq: predictHQCount,
           google: googleCount,
-          webscrape: webscrapeCount,
-          meraki: merakiCount
+          webscrape: webscrapeCount
+          // Meraki removed as requested
         },
         message: events.length > 0 
           ? `Found ${events.length} networking events matching your profile`

@@ -566,8 +566,6 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
         return <Badge variant="outline" className="text-xs bg-orange-50">Eventbrite</Badge>
       case 'ticketmaster':
         return <Badge variant="outline" className="text-xs bg-blue-50">Ticketmaster</Badge>
-      case 'meraki':
-        return <Badge variant="outline" className="text-xs bg-green-50">Meraki</Badge>
       case 'predicthq':
         return <Badge variant="outline" className="text-xs bg-yellow-50">PredictHQ</Badge>
       case 'google':
