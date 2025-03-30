@@ -153,15 +153,25 @@ export async function searchEventbriteEvents(
       url += `&location.address=${encodeURIComponent(location)}`;
     }
     
+    console.log(`[Eventbrite] Attempting to fetch events with URL: ${url}`);
+    
     // Make API request to Eventbrite
     const response = await axios.get(url, {
       headers: {
         'Authorization': `Bearer ${EVENTBRITE_TOKEN}`
-      }
+      },
+      validateStatus: (status) => status < 500, // Accept any status code less than 500 to handle 404s gracefully
     });
     
+    // Check if the response contains an error
+    if (response.data && response.data.error) {
+      console.error(`[Eventbrite] API Error: ${response.data.error} - ${response.data.error_description}`);
+      return [];
+    }
+    
     // Map Eventbrite events to standardized format
-    if (response.data && response.data.events) {
+    if (response.data && response.data.events && Array.isArray(response.data.events)) {
+      console.log(`[Eventbrite] Successfully fetched ${response.data.events.length} events`);
       return response.data.events.map((event: EventbriteEvent) => {
         // Determine event type based on Eventbrite category (simplified)
         let type: NetworkingEvent['type'] = "other";
@@ -227,11 +237,22 @@ export async function searchTicketmasterEvents(
       url += `&city=${encodeURIComponent(location)}`;
     }
     
+    console.log(`[Ticketmaster] Attempting to fetch events with URL: ${url.replace(TICKETMASTER_KEY, '***')}`);
+    
     // Make API request to Ticketmaster
-    const response = await axios.get(url);
+    const response = await axios.get(url, {
+      validateStatus: (status) => status < 500, // Accept any status code less than 500 to handle errors gracefully
+    });
+    
+    // Check for errors in the response
+    if (response.status !== 200) {
+      console.error(`[Ticketmaster] API Error: Status ${response.status}`);
+      return [];
+    }
     
     // Map Ticketmaster events to standardized format
     if (response.data && response.data._embedded && response.data._embedded.events) {
+      console.log(`[Ticketmaster] Successfully fetched ${response.data._embedded.events.length} events`);
       return response.data._embedded.events.map((event: TicketmasterEvent) => {
         // Extract venue information
         const venue = event._embedded?.venues?.[0];
@@ -395,6 +416,19 @@ export async function getNetworkingEvents(
   location?: string
 ): Promise<NetworkingEvent[]> {
   try {
+    console.log(`[NetworkingService] Fetching events for personality: ${personalityType}`);
+    console.log(`[NetworkingService] Career interests: ${careerInterests.join(', ')}`);
+    
+    // Validate input parameters
+    if (!careerInterests || careerInterests.length === 0) {
+      console.error('[NetworkingService] Error: No career interests provided');
+      return [];
+    }
+    
+    if (!personalityType) {
+      console.warn('[NetworkingService] Warning: No personality type provided, using default matching');
+    }
+    
     // Generate keywords based on career interests
     // Add networking-specific terms to the search
     const keywords = [
@@ -405,14 +439,24 @@ export async function getNetworkingEvents(
       'development'
     ];
     
+    console.log(`[NetworkingService] Generated search keywords: ${keywords.join(', ')}`);
+    
     // Fetch events from both APIs in parallel
     const [eventbriteEvents, ticketmasterEvents] = await Promise.all([
       searchEventbriteEvents(keywords, location),
       searchTicketmasterEvents(keywords, location)
     ]);
     
+    console.log(`[NetworkingService] Eventbrite returned ${eventbriteEvents.length} events`);
+    console.log(`[NetworkingService] Ticketmaster returned ${ticketmasterEvents.length} events`);
+    
     // Combine events from both sources
     const allEvents = [...eventbriteEvents, ...ticketmasterEvents];
+    
+    if (allEvents.length === 0) {
+      console.warn('[NetworkingService] No events found from any source');
+      return [];
+    }
     
     // Add relevance scores based on user profile
     const scoredEvents = calculateRelevanceScores(
@@ -422,9 +466,13 @@ export async function getNetworkingEvents(
     );
     
     // Sort by relevance score (highest first)
-    return scoredEvents.sort((a, b) => 
+    const sortedEvents = scoredEvents.sort((a, b) => 
       (b.relevanceScore || 0) - (a.relevanceScore || 0)
     );
+    
+    console.log(`[NetworkingService] Returning ${sortedEvents.length} events sorted by relevance`);
+    
+    return sortedEvents;
   } catch (error) {
     console.error('Error fetching networking events:', error);
     return [];
