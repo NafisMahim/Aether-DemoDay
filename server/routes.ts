@@ -8,6 +8,7 @@ import { configurePassport, hashPassword } from "./auth";
 import MemoryStore from "memorystore";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { findInternships, generateInternshipRecommendations } from "./internshipService";
+import { getNetworkingEvents } from "./networkingService";
 
 // Initialize Gemini AI
 const geminiApiKey = process.env.GEMINI_API_KEY;
@@ -1390,6 +1391,164 @@ Now, please respond to this user message: ${message}`;
         success: false,
         message: 'Failed to get response from A1',
         error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Networking events API endpoint - GET method to retrieve networking events
+  app.get('/api/networking/events', async (req, res) => {
+    try {
+      const { careerInterests, personalityType, location, limit } = req.query;
+      
+      // Convert query parameters to appropriate types
+      const parsedInterests = typeof careerInterests === 'string' 
+        ? [careerInterests] 
+        : Array.isArray(careerInterests) 
+          ? careerInterests.map(String) 
+          : [];
+      
+      const parsedPersonalityType = String(personalityType || '');
+      const parsedLocation = String(location || '');
+      
+      // Validate required parameters
+      if (!parsedInterests.length && !parsedPersonalityType) {
+        return res.status(400).json({
+          success: false,
+          message: 'At least one career interest or personality type is required'
+        });
+      }
+      
+      console.log('Networking events search parameters:', {
+        careerInterests: parsedInterests,
+        personalityType: parsedPersonalityType,
+        location: parsedLocation
+      });
+      
+      // Get networking events using the external APIs
+      const events = await getNetworkingEvents(
+        parsedInterests,
+        parsedPersonalityType,
+        parsedLocation
+      );
+      
+      return res.status(200).json({
+        success: true,
+        events,
+        count: events.length,
+        message: events.length > 0 
+          ? `Found ${events.length} networking events matching your profile`
+          : 'No networking events found for your criteria'
+      });
+    } catch (error) {
+      console.error('Error fetching networking events:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Error fetching networking events',
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+  
+  // POST method for the same endpoint to support form submissions
+  app.post('/api/networking/events', async (req, res) => {
+    try {
+      const { careerInterests, personalityType, location, quizResults } = req.body;
+      
+      // Extract career interests from quiz results if needed
+      let extractedInterests: string[] = [];
+      let extractedPersonalityType = '';
+      
+      if (quizResults) {
+        // Extract personality type from various quiz result formats
+        if (quizResults.personalityType) {
+          extractedPersonalityType = String(quizResults.personalityType);
+        } else if (quizResults.primaryType) {
+          if (typeof quizResults.primaryType === 'string') {
+            extractedPersonalityType = quizResults.primaryType;
+          } else if (quizResults.primaryType && quizResults.primaryType.name) {
+            extractedPersonalityType = quizResults.primaryType.name;
+            
+            // Also extract career options if available
+            if (quizResults.primaryType.careers && Array.isArray(quizResults.primaryType.careers)) {
+              extractedInterests = [...extractedInterests, ...quizResults.primaryType.careers];
+            }
+          }
+        } else if (quizResults.dominantType) {
+          extractedPersonalityType = String(quizResults.dominantType);
+        }
+        
+        // Extract more career interests from different quiz result formats
+        if (quizResults.careerInterests) {
+          if (Array.isArray(quizResults.careerInterests)) {
+            extractedInterests = [...extractedInterests, ...quizResults.careerInterests];
+          }
+        }
+        
+        if (quizResults.hybridCareers && Array.isArray(quizResults.hybridCareers)) {
+          extractedInterests = [...extractedInterests, ...quizResults.hybridCareers];
+        }
+        
+        if (quizResults.strengths && Array.isArray(quizResults.strengths)) {
+          extractedInterests = [...extractedInterests, ...quizResults.strengths];
+        }
+      }
+      
+      // Use provided values or defaults from quiz results
+      const finalInterests = Array.isArray(careerInterests) && careerInterests.length > 0
+        ? careerInterests
+        : extractedInterests;
+      
+      const finalPersonalityType = personalityType || extractedPersonalityType;
+      
+      // Validate required parameters
+      if (!finalInterests.length && !finalPersonalityType) {
+        return res.status(400).json({
+          success: false,
+          message: 'No career interests or personality type provided in either parameters or quiz results'
+        });
+      }
+      
+      console.log('Networking events search parameters:', {
+        careerInterests: finalInterests,
+        personalityType: finalPersonalityType,
+        location: location || 'Not specified'
+      });
+      
+      // Get networking events using the external APIs
+      const events = await getNetworkingEvents(
+        finalInterests,
+        finalPersonalityType,
+        location
+      );
+      
+      // Determine API source information for client
+      const eventbriteCount = events.filter(e => e.source === 'eventbrite').length;
+      const ticketmasterCount = events.filter(e => e.source === 'ticketmaster').length;
+      
+      const apiStatus = {
+        eventbrite: eventbriteCount > 0 ? 'available' : 'unavailable',
+        ticketmaster: ticketmasterCount > 0 ? 'available' : 'unavailable'
+      };
+      
+      return res.status(200).json({
+        success: true,
+        events,
+        count: events.length,
+        apiStatus,
+        sources: {
+          eventbrite: eventbriteCount,
+          ticketmaster: ticketmasterCount
+        },
+        message: events.length > 0 
+          ? `Found ${events.length} networking events matching your profile`
+          : 'No networking events found for your criteria'
+      });
+    } catch (error) {
+      console.error('Error fetching networking events:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Error fetching networking events',
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });

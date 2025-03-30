@@ -1,4 +1,6 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { fetchNetworkingEvents, NetworkingEvent as ApiNetworkingEvent } from "@/utils/networkingService"
 import { 
   FileText, Share2, Download, Clock, Search, Calendar, Users, Briefcase, 
   Plus, Edit, Trash, CheckCircle2, ExternalLink, DownloadCloud, ArrowRight,
@@ -206,89 +208,115 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
     return { personalityType, careerInterests }
   }, [quizResults])
   
-  // AI-generated networking opportunities based on career interests
-  const networkingOpportunities = useMemo(() => {
-    const { personalityType, careerInterests } = careerProfile
-    
-    // Generate personalized networking opportunities based on career interests
-    const baseOpportunities: NetworkingOpportunity[] = [
-      {
-        id: "net1",
-        title: "Tech Innovators Meetup",
-        type: "conference",
-        description: "Monthly gathering of tech professionals discussing emerging technologies and industry trends.",
-        url: "https://meetup.com/tech-innovators",
-        relevanceScore: 92,
-        industry: "Technology",
-        tags: ["Technology", "Innovation", "Networking"]
-      },
-      {
-        id: "net2",
-        title: "Women in Design Community",
-        type: "community",
-        description: "Supportive community for women in design to share resources, mentorship, and job opportunities.",
-        url: "https://discord.gg/women-in-design",
-        relevanceScore: 85,
-        industry: "Design",
-        tags: ["Design", "Community", "Mentorship"]
-      },
-      {
-        id: "net3",
-        title: "Product Management Fellowship",
-        type: "program",
-        description: "Six-month fellowship connecting early-career product managers with industry mentors and resources.",
-        url: "https://productfellowship.org",
-        relevanceScore: 78,
-        industry: "Product",
-        tags: ["Product Management", "Leadership", "Career Development"]
-      },
-      {
-        id: "net4",
-        title: "Creative Industries Mentorship",
-        type: "mentorship",
-        description: "Structured mentorship program pairing creative professionals with industry leaders.",
-        url: "https://creativementorship.org",
-        relevanceScore: 89,
-        industry: "Creative",
-        tags: ["Creative", "Mentorship", "Career Development"],
-        date: "Applications open May 1, 2025"
-      },
-      {
-        id: "net5",
-        title: "Young Leaders Network",
-        type: "organization",
-        description: "Organization for early-career professionals focused on leadership development and networking.",
-        url: "https://youngleadersnetwork.org",
-        relevanceScore: 75,
-        industry: "Cross-industry",
-        tags: ["Leadership", "Networking", "Professional Development"]
-      }
-    ]
-    
-    // Sort opportunities based on relevance to career interests
-    const personalizedOpportunities = baseOpportunities
-      .map(opportunity => {
-        // Calculate a personalized relevance score based on career interest matches
-        const interestMatches = careerInterests.filter(interest => 
-          opportunity.tags.some(tag => 
-            tag.toLowerCase().includes(interest.toLowerCase()) ||
-            interest.toLowerCase().includes(tag.toLowerCase())
-          )
-        ).length
-        
-        // Adjust relevance score based on matches
-        const adjustedScore = opportunity.relevanceScore + 
-          (interestMatches > 0 ? (interestMatches * 5) : -10)
-        
-        return {
-          ...opportunity,
-          relevanceScore: Math.min(100, Math.max(50, adjustedScore))
-        }
+  // Fetch networking events from the API based on quiz results
+  const { 
+    data: networkingData,
+    isLoading: isLoadingEvents,
+    error: networkingError
+  } = useQuery({
+    queryKey: ['/api/networking/events', careerProfile],
+    queryFn: async () => {
+      const { personalityType, careerInterests } = careerProfile
+      return await fetchNetworkingEvents(quizResults, {
+        additionalInterests: careerInterests
       })
-      .sort((a, b) => b.relevanceScore - a.relevanceScore)
-    
-    return personalizedOpportunities
-  }, [careerProfile])
+    },
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  })
+
+  // Convert API events to NetworkingOpportunity format
+  const networkingOpportunities = useMemo(() => {
+    // Default to empty array if no data or error
+    if (!networkingData?.events || networkingData.events.length === 0) {
+      return [
+        {
+          id: "net1",
+          title: "Tech Innovators Meetup",
+          type: "conference",
+          description: "Monthly gathering of tech professionals discussing emerging technologies and industry trends.",
+          url: "https://meetup.com/tech-innovators",
+          relevanceScore: 92,
+          industry: "Technology",
+          tags: ["Technology", "Innovation", "Networking"]
+        },
+        {
+          id: "net2",
+          title: "Women in Design Community",
+          type: "community",
+          description: "Supportive community for women in design to share resources, mentorship, and job opportunities.",
+          url: "https://discord.gg/women-in-design",
+          relevanceScore: 85,
+          industry: "Design",
+          tags: ["Design", "Community", "Mentorship"]
+        },
+        {
+          id: "net3",
+          title: "Product Management Fellowship",
+          type: "program",
+          description: "Six-month fellowship connecting early-career product managers with industry mentors and resources.",
+          url: "https://productfellowship.org",
+          relevanceScore: 78,
+          industry: "Product",
+          tags: ["Product Management", "Leadership", "Career Development"]
+        },
+        {
+          id: "net4",
+          title: "Creative Industries Mentorship",
+          type: "mentorship",
+          description: "Structured mentorship program pairing creative professionals with industry leaders.",
+          url: "https://creativementorship.org",
+          relevanceScore: 89,
+          industry: "Creative",
+          tags: ["Creative", "Mentorship", "Career Development"],
+          date: "Applications open May 1, 2025"
+        },
+        {
+          id: "net5",
+          title: "Young Leaders Network",
+          type: "organization",
+          description: "Organization for early-career professionals focused on leadership development and networking.",
+          url: "https://youngleadersnetwork.org",
+          relevanceScore: 75,
+          industry: "Cross-industry",
+          tags: ["Leadership", "Networking", "Professional Development"]
+        }
+      ]
+    }
+
+    // Convert API events to our NetworkingOpportunity format
+    return networkingData.events.map(event => {
+      // Map event type to appropriate NetworkingOpportunity type
+      let opportunityType: NetworkingOpportunity['type'] = "conference";
+      
+      if (event.type === "workshop") {
+        opportunityType = "program";
+      } else if (event.type === "meetup" || event.type === "networking") {
+        opportunityType = "community";
+      } else if (event.type === "other") {
+        opportunityType = "organization";
+      }
+      
+      // Determine industry from categories or source
+      let industry = event.categories && event.categories.length > 0
+        ? event.categories[0]
+        : event.source === "eventbrite" 
+          ? "Professional" 
+          : "Entertainment";
+      
+      return {
+        id: event.id,
+        title: event.title,
+        type: opportunityType,
+        description: event.description,
+        url: event.url,
+        relevanceScore: event.relevanceScore || 75,
+        industry: industry,
+        tags: event.categories || [],
+        location: [event.venue, event.city, event.state].filter(Boolean).join(', '),
+        date: event.date
+      } as NetworkingOpportunity;
+    }).sort((a, b) => b.relevanceScore - a.relevanceScore);
+  }, [networkingData])
   
   // Filtered networking opportunities based on search
   const filteredOpportunities = useMemo(() => {
@@ -411,7 +439,7 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
     
     // Reset form
     setNewResumeSection({
-      type: resumeSectionType,
+      type: resumeSectionType as "experience" | "education" | "skills" | "projects" | "certifications",
       title: "",
       organization: "",
       date: "",
@@ -517,7 +545,7 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
             </svg>
           </button>
-          <h1 className="text-xl font-bold">Virtual Networking</h1>
+          <h1 className="text-xl font-bold">Networking</h1>
         </div>
       </header>
 
@@ -560,17 +588,24 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
               </Badge>
             </div>
             
-            {filteredOpportunities.length === 0 ? (
+            {isLoadingEvents ? (
+              <div className="flex flex-col items-center justify-center p-6 text-center border border-dashed rounded-lg">
+                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mb-2"></div>
+                <p className="text-muted-foreground">Loading networking opportunities...</p>
+              </div>
+            ) : filteredOpportunities.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-6 text-center border border-dashed rounded-lg">
                 <Users className="h-8 w-8 text-muted-foreground mb-2" />
-                <p className="text-muted-foreground">No networking opportunities found</p>
-                {searchQuery && (
+                <p className="text-muted-foreground">
+                  {networkingError ? 'Error loading networking events' : 'No networking opportunities found'}
+                </p>
+                {(searchQuery || networkingError) && (
                   <Button 
                     variant="link" 
                     className="mt-1 h-auto p-0"
                     onClick={() => setSearchQuery("")}
                   >
-                    Clear search
+                    {networkingError ? 'Try again' : 'Clear search'}
                   </Button>
                 )}
               </div>
@@ -750,7 +785,7 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
                         value={resumeSectionType}
                         onValueChange={(value) => {
                           setResumeSectionType(value)
-                          setNewResumeSection(prev => ({ ...prev, type: value as any }))
+                          setNewResumeSection(prev => ({ ...prev, type: value as "experience" | "education" | "skills" | "projects" | "certifications" }))
                         }}
                       >
                         <SelectTrigger>
