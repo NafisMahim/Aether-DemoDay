@@ -75,6 +75,25 @@ async function testNetworkingAPIs() {
     console.error('❌ WebScrape API: Failed -', error.message);
   }
   
+  // Test PredictHQ API
+  console.log('\n--- PREDICTHQ API TEST ---');
+  try {
+    const phqRes = await axios.get('http://localhost:5000/api/networking/test/predicthq', {
+      timeout: 15000
+    });
+    
+    console.log(`✅ PredictHQ API: ${phqRes.data.success ? 'Success' : 'Failed'}`);
+    console.log(`Found ${phqRes.data.events?.length || 0} events`);
+    
+    if (phqRes.data.events && phqRes.data.events.length > 0) {
+      console.log('Sample: ' + phqRes.data.events[0].title);
+      console.log('Date: ' + phqRes.data.events[0].date);
+      console.log('Type: ' + phqRes.data.events[0].type);
+    }
+  } catch (error) {
+    console.error('❌ PredictHQ API: Failed -', error.message);
+  }
+  
   console.log('\nAPI testing completed!');
 }
 

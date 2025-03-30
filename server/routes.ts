@@ -1525,10 +1525,18 @@ Now, please respond to this user message: ${message}`;
       // Determine API source information for client
       const eventbriteCount = events.filter(e => e.source === 'eventbrite').length;
       const ticketmasterCount = events.filter(e => e.source === 'ticketmaster').length;
+      const predictHQCount = events.filter(e => e.source === 'predicthq').length;
+      const googleCount = events.filter(e => e.source === 'google').length;
+      const webscrapeCount = events.filter(e => e.source === 'webscrape').length;
+      const merakiCount = events.filter(e => e.source === 'meraki').length;
       
       const apiStatus = {
         eventbrite: eventbriteCount > 0 ? 'available' : 'unavailable',
-        ticketmaster: ticketmasterCount > 0 ? 'available' : 'unavailable'
+        ticketmaster: ticketmasterCount > 0 ? 'available' : 'unavailable',
+        predicthq: predictHQCount > 0 ? 'available' : 'unavailable',
+        google: googleCount > 0 ? 'available' : 'unavailable',
+        webscrape: webscrapeCount > 0 ? 'available' : 'unavailable',
+        meraki: merakiCount > 0 ? 'available' : 'unavailable'
       };
       
       return res.status(200).json({
@@ -1538,7 +1546,11 @@ Now, please respond to this user message: ${message}`;
         apiStatus,
         sources: {
           eventbrite: eventbriteCount,
-          ticketmaster: ticketmasterCount
+          ticketmaster: ticketmasterCount,
+          predicthq: predictHQCount,
+          google: googleCount,
+          webscrape: webscrapeCount,
+          meraki: merakiCount
         },
         message: events.length > 0 
           ? `Found ${events.length} networking events matching your profile`

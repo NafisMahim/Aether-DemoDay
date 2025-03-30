@@ -49,6 +49,9 @@ async function testAllAPIs() {
     // Test RapidAPI Web Scraping
     await testAPI('RapidAPI Web Scraping', 'http://localhost:5000/api/networking/test/webscrape', 5000);
     
+    // Test PredictHQ API
+    await testAPI('PredictHQ', 'http://localhost:5000/api/networking/test/predicthq', 10000);
+    
     console.log('\nAll API testing completed!');
   } catch (error) {
     console.error('Error during API testing:', error);

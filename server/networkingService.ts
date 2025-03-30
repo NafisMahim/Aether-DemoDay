@@ -1,5 +1,6 @@
 import axios from 'axios';
 import * as dotenv from 'dotenv';
+import { format, addDays } from 'date-fns';
 
 dotenv.config();
 
@@ -22,6 +23,9 @@ const RAPIDAPI_KEY = "3f9c2ecba6mshd1f47ab59b16e42p1e8991jsn055e3aba0a5a"; // Us
 const GOOGLE_CSE_ID = process.env.GOOGLE_CSE_ID; // Custom Search Engine ID
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY; // Same key used for Gemini
 
+// PredictHQ API credentials
+const PREDICTHQ_API_TOKEN = process.env.PREDICTHQ_API_TOKEN;
+
 // For debugging
 console.log('[NetworkingService] API credentials available:', {
   eventbrite: {
@@ -42,6 +46,9 @@ console.log('[NetworkingService] API credentials available:', {
   google: {
     apiKeyAvailable: !!GOOGLE_API_KEY,
     cseIdAvailable: !!GOOGLE_CSE_ID
+  },
+  predicthq: {
+    apiTokenAvailable: !!PREDICTHQ_API_TOKEN
   }
 });
 
@@ -165,7 +172,7 @@ export interface NetworkingEvent {
   type: "conference" | "workshop" | "meetup" | "concert" | "sporting" | "networking" | "other";
   categories: string[];
   industry?: string;
-  source: "eventbrite" | "ticketmaster" | "meraki" | "generated" | "google" | "webscrape";
+  source: "eventbrite" | "ticketmaster" | "meraki" | "generated" | "google" | "webscrape" | "predicthq";
   image?: string;
   relevanceScore?: number;
 }
@@ -1854,6 +1861,365 @@ function extractLocation(content: string): string | undefined {
   return undefined;
 }
 
+// Define the PredictHQ event interface based on their API response
+interface PredictHQEvent {
+  id: string;
+  title: string;
+  description?: string;
+  start: string; // ISO date string
+  end?: string; // ISO date string
+  timezone?: string;
+  location?: {
+    lat: number;
+    lon: number;
+  };
+  entities?: {
+    name?: string;
+    formatted_address?: string;
+    type?: string;
+    location?: {
+      lat: number;
+      lon: number;
+    };
+  }[];
+  category: string;
+  labels: string[];
+  rank: number;
+  local_rank?: number;
+  aviation_rank?: number;
+  phq_attendance?: number;
+  place_hierarchies?: string[][];
+  state?: string;
+  country?: string;
+  private?: boolean;
+}
+
+/**
+ * Search for events using PredictHQ API
+ * @param interestKeywords Array of keywords to search for
+ * @param location Optional location parameter (city, address, etc.)
+ * @returns Promise resolving to array of standardized networking events
+ */
+export async function searchPredictHQEvents(
+  interestKeywords: string[],
+  location?: string
+): Promise<NetworkingEvent[]> {
+  try {
+    if (!PREDICTHQ_API_TOKEN) {
+      console.error('[PredictHQ] API token is missing');
+      return [];
+    }
+
+    console.log('[PredictHQ] Starting event search');
+
+    // Format today's date in YYYY-MM-DD format
+    const today = format(new Date(), 'yyyy-MM-dd');
+    
+    // Set an end date 6 months from now
+    const sixMonthsLater = format(addDays(new Date(), 180), 'yyyy-MM-dd');
+
+    // Build category filters - focusing on business/professional events
+    const categories = [
+      'conferences',
+      'expos',
+      'community'
+    ].join(',');
+
+    // Filter keywords to avoid problematic search terms
+    const filteredKeywords = interestKeywords
+      .filter(keyword => 
+        keyword.length < 50 && 
+        !keyword.includes("'") && 
+        !keyword.includes(".")
+      )
+      .slice(0, 3); // Limit to avoid overwhelming the API
+
+    // Create various API call strategies to get diverse results
+    const searchStrategies = [
+      // Strategy 1: Business and conference focus with keywords
+      {
+        q: filteredKeywords.length > 0 ? 
+           filteredKeywords.join(' ') + ' business conference' : 
+           'business conference networking',
+        'active.gte': today,
+        'active.lte': sixMonthsLater,
+        category: categories,
+        limit: 20,
+        sort: 'rank'
+      },
+      // Strategy 2: Professional development focus
+      {
+        q: 'professional development networking',
+        'active.gte': today,
+        'active.lte': sixMonthsLater,
+        category: categories,
+        limit: 20,
+        sort: 'rank'
+      },
+      // Strategy 3: Career-focused events
+      {
+        q: 'career networking jobs',
+        'active.gte': today,
+        'active.lte': sixMonthsLater,
+        category: categories,
+        limit: 20,
+        sort: 'rank'
+      }
+    ];
+
+    // If location is provided, add it to strategies
+    if (location) {
+      const locationStrategies = searchStrategies.map(strategy => ({
+        ...strategy,
+        q: `${strategy.q} ${location}`
+      }));
+      searchStrategies.push(...locationStrategies);
+    }
+
+    let allEvents: PredictHQEvent[] = [];
+
+    // Try each search strategy
+    for (const [index, strategy] of searchStrategies.entries()) {
+      try {
+        console.log(`[PredictHQ] Trying search strategy ${index + 1}:`, strategy);
+
+        // Add delay between requests to avoid rate limiting
+        if (index > 0) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * index));
+        }
+
+        // Build the query parameters
+        const params = new URLSearchParams();
+        for (const [key, value] of Object.entries(strategy)) {
+          params.append(key, value.toString());
+        }
+
+        // Make the API request
+        const response = await axios.get(`https://api.predicthq.com/v1/events?${params.toString()}`, {
+          headers: {
+            'Authorization': `Bearer ${PREDICTHQ_API_TOKEN}`,
+            'Accept': 'application/json'
+          },
+          timeout: 10000
+        });
+
+        // Process the results if they exist
+        if (response.data && response.data.results) {
+          const events = response.data.results as PredictHQEvent[];
+          console.log(`[PredictHQ] Strategy ${index + 1} found ${events.length} events`);
+
+          // Add events to our collection, filtering out duplicates
+          const newEvents = events.filter(event => 
+            !allEvents.some(existingEvent => existingEvent.id === event.id)
+          );
+          
+          allEvents = [...allEvents, ...newEvents];
+
+          // If we have enough events, we can stop searching
+          if (allEvents.length >= 40) {
+            console.log('[PredictHQ] Found enough events, stopping search');
+            break;
+          }
+        } else {
+          console.log(`[PredictHQ] Strategy ${index + 1} returned no events`);
+        }
+      } catch (strategyError: any) {
+        console.error(`[PredictHQ] Strategy ${index + 1} failed:`, strategyError.message);
+      }
+    }
+
+    console.log(`[PredictHQ] Total unique events found: ${allEvents.length}`);
+
+    // Process events into our standard format
+    const processedEvents: NetworkingEvent[] = allEvents.map(event => {
+      // Convert PredictHQ event to our NetworkingEvent format
+      
+      // Determine event type
+      let type: NetworkingEvent['type'] = "other";
+      const titleLower = event.title.toLowerCase();
+      const category = event.category.toLowerCase();
+      
+      if (
+        titleLower.includes('conference') || 
+        titleLower.includes('summit') || 
+        category === 'conferences'
+      ) {
+        type = "conference";
+      } 
+      else if (
+        titleLower.includes('workshop') || 
+        titleLower.includes('training') || 
+        titleLower.includes('seminar')
+      ) {
+        type = "workshop";
+      } 
+      else if (
+        titleLower.includes('meetup') || 
+        titleLower.includes('meet up') || 
+        titleLower.includes('meeting')
+      ) {
+        type = "meetup";
+      }
+      else if (
+        titleLower.includes('networking') || 
+        titleLower.includes('mixer') || 
+        titleLower.includes('social')
+      ) {
+        type = "networking";
+      }
+      else if (category === 'expos') {
+        type = "conference";
+      }
+      else if (category === 'community') {
+        type = "networking";
+      }
+      
+      // Determine categories based on event labels and title
+      const categories: string[] = [];
+      
+      // Map PredictHQ labels to our categories
+      if (event.labels && event.labels.length > 0) {
+        const labelMapping: Record<string, string> = {
+          'business': 'Business',
+          'technology': 'Technology',
+          'tech': 'Technology',
+          'education': 'Education',
+          'networking': 'Networking',
+          'professional': 'Professional Development',
+          'career': 'Career Development',
+          'leadership': 'Leadership',
+          'entrepreneur': 'Entrepreneurship',
+          'finance': 'Finance',
+          'marketing': 'Marketing',
+          'sales': 'Sales',
+          'startup': 'Entrepreneurship'
+        };
+        
+        event.labels.forEach(label => {
+          const lcLabel = label.toLowerCase();
+          for (const [keyword, category] of Object.entries(labelMapping)) {
+            if (lcLabel.includes(keyword) && !categories.includes(category)) {
+              categories.push(category);
+            }
+          }
+        });
+      }
+      
+      // If no categories were found from labels, extract from title
+      if (categories.length === 0) {
+        const categoryKeywords = [
+          { keyword: 'business', category: 'Business' },
+          { keyword: 'tech', category: 'Technology' },
+          { keyword: 'technology', category: 'Technology' },
+          { keyword: 'education', category: 'Education' },
+          { keyword: 'networking', category: 'Networking' },
+          { keyword: 'professional', category: 'Professional Development' },
+          { keyword: 'career', category: 'Career Development' },
+          { keyword: 'leadership', category: 'Leadership' },
+          { keyword: 'entrepreneur', category: 'Entrepreneurship' },
+          { keyword: 'startup', category: 'Entrepreneurship' },
+          { keyword: 'finance', category: 'Finance' },
+          { keyword: 'marketing', category: 'Marketing' },
+          { keyword: 'sales', category: 'Sales' }
+        ];
+        
+        categoryKeywords.forEach(({ keyword, category }) => {
+          if (titleLower.includes(keyword) && !categories.includes(category)) {
+            categories.push(category);
+          }
+        });
+      }
+      
+      // Add default category if none found
+      if (categories.length === 0) {
+        if (type === "conference") {
+          categories.push('Business');
+        } else if (type === "workshop") {
+          categories.push('Professional Development');
+        } else {
+          categories.push('Networking');
+        }
+      }
+      
+      // Determine industry based on categories, defaulting to first category
+      let industry = categories.length > 0 ? categories[0] : 'Professional Development';
+      
+      // Extract date and time
+      const startDate = new Date(event.start);
+      const date = startDate.toISOString().split('T')[0];
+      const time = startDate.toISOString().split('T')[1].substring(0, 5);
+      
+      // Build location string
+      let location: string | undefined = undefined;
+      let city: string | undefined = undefined;
+      let state: string | undefined = undefined;
+      let country: string | undefined = event.country;
+      let venue: string | undefined = undefined;
+      
+      // Try to extract location details from entities
+      if (event.entities && event.entities.length > 0) {
+        const venueEntity = event.entities.find(entity => entity.type === 'venue');
+        const placeEntity = event.entities.find(entity => entity.type === 'place');
+        
+        if (venueEntity) {
+          venue = venueEntity.name;
+          location = venueEntity.formatted_address;
+        }
+        
+        if (placeEntity && !location) {
+          location = placeEntity.formatted_address;
+        }
+      }
+      
+      // If we still don't have location and there's a place hierarchy, use that
+      if (!location && event.place_hierarchies && event.place_hierarchies.length > 0) {
+        const placeHierarchy = event.place_hierarchies[0];
+        // Typically structured as [country, state, county, city, etc]
+        if (placeHierarchy.length >= 4) {
+          city = placeHierarchy[3];
+          state = placeHierarchy[2];
+          country = placeHierarchy[0];
+          location = [city, state, country].filter(Boolean).join(', ');
+        }
+      }
+      
+      // Make sure description isn't too long
+      let description = event.description || 'Professional networking event';
+      if (description.length > 300) {
+        description = description.substring(0, 297) + '...';
+      }
+      
+      // Generate a URL if one is not provided
+      const url = `https://predicthq.com/events/${event.id}`;
+      
+      return {
+        id: event.id,
+        title: event.title,
+        description,
+        date,
+        time,
+        location,
+        city,
+        state,
+        country,
+        venue,
+        url,
+        type,
+        categories,
+        industry,
+        source: "predicthq",
+        // Add a relevance score based on the event's rank
+        relevanceScore: event.rank / 100
+      };
+    });
+
+    return processedEvents;
+  } catch (error: any) {
+    console.error('[PredictHQ] Error searching for events:', error.message);
+    return [];
+  }
+}
+
 export async function getNetworkingEvents(
   careerProfile: { 
     careers?: string[];
@@ -1898,6 +2264,7 @@ export async function getNetworkingEvents(
     let googleEvents: NetworkingEvent[] = [];
     let webScrapeEvents: NetworkingEvent[] = [];
     let merakiEvents: NetworkingEvent[] = [];
+    let predictHQEvents: NetworkingEvent[] = [];
     
     // First try Ticketmaster (most reliable currently)
     console.log('[NetworkingService] Prioritizing Ticketmaster API (known working endpoint)');
@@ -1944,8 +2311,18 @@ export async function getNetworkingEvents(
       console.error('[NetworkingService] Error fetching from Meraki API:', error);
     }
     
+    // Try using PredictHQ API as a new reliable source
+    console.log('[NetworkingService] Trying PredictHQ API for professional events');
+    try {
+      predictHQEvents = await searchPredictHQEvents(keywords, location);
+      console.log(`[NetworkingService] PredictHQ API returned ${predictHQEvents.length} events`);
+    } catch (error) {
+      console.error('[NetworkingService] Error fetching from PredictHQ API:', error);
+    }
+    
     // Combine all events from all sources with prioritization
     const allEvents = [
+      ...predictHQEvents, // Prioritize PredictHQ events as they're more reliable and business-focused
       ...ticketmasterEvents, 
       ...googleEvents,
       ...webScrapeEvents,

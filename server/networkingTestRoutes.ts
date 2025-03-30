@@ -4,7 +4,8 @@ import {
   searchEventbriteEvents, 
   searchTicketmasterEvents, 
   searchGoogleForEvents, 
-  searchWebScrapingForEvents 
+  searchWebScrapingForEvents,
+  searchPredictHQEvents
 } from './networkingService';
 
 const router = Router();
@@ -69,6 +70,39 @@ router.get('/webscrape', async (_req: Request, res: Response) => {
     res.status(500).json({ 
       success: false, 
       message: 'Failed to test RapidAPI Web Scraping', 
+      error: error.message 
+    });
+  }
+});
+
+router.get('/predicthq', async (_req: Request, res: Response) => {
+  try {
+    console.log('Testing PredictHQ API for events...');
+    console.log('PredictHQ Token exists:', !!process.env.PREDICTHQ_API_TOKEN);
+    
+    // Set content type header explicitly
+    res.setHeader('Content-Type', 'application/json');
+    
+    const testInterests = ['conference', 'business', 'networking'];
+    console.log('Starting PredictHQ search with interests:', testInterests);
+    
+    const events = await searchPredictHQEvents(testInterests, 'New York');
+    console.log('PredictHQ search completed, found events:', events.length);
+    
+    // Return response immediately
+    return res.json({ 
+      success: true, 
+      count: events.length,
+      events 
+    });
+  } catch (error: any) {
+    console.error('Error testing PredictHQ API:', error);
+    // Set content type header explicitly
+    res.setHeader('Content-Type', 'application/json');
+    
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Failed to test PredictHQ API', 
       error: error.message 
     });
   }
