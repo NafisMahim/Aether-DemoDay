@@ -912,6 +912,8 @@ function calculateRelevanceScores(
   userInterests: string[],
   personalityType: string
 ): NetworkingEvent[] {
+  console.log(`[Relevance] Calculating scores with personality: "${personalityType}" and interests:`, userInterests);
+  
   // Define career-related keywords for stronger filtering
   const careerKeywords = [
     'business', 'conference', 'leadership', 'professional', 'career', 
@@ -927,34 +929,63 @@ function calculateRelevanceScores(
   
   const personality = personalityType.toLowerCase();
   
-  // Personality preferences mapping for event types
-  const personalityPreferences: Record<string, string[]> = {
-    'analytical': ['conference', 'workshop', 'meetup'],
-    'creative': ['workshop', 'meetup', 'networking'],
-    'social': ['networking', 'meetup', 'conference'],
-    'practical': ['workshop', 'conference', 'networking']
+  // More detailed personality preferences mapping for event types
+  const personalityPreferences: Record<string, {
+    preferredTypes: string[],
+    preferredFormat: string[],
+    scoringBoost: number
+  }> = {
+    'analytical': {
+      preferredTypes: ['conference', 'workshop', 'meetup'],
+      preferredFormat: ['data', 'research', 'analysis', 'discussion', 'technology'],
+      scoringBoost: 20
+    },
+    'creative': {
+      preferredTypes: ['workshop', 'meetup', 'networking', 'other'],
+      preferredFormat: ['design', 'innovation', 'creative', 'collaborative', 'brainstorming'],
+      scoringBoost: 20
+    },
+    'social': {
+      preferredTypes: ['networking', 'meetup', 'conference', 'other'],
+      preferredFormat: ['interaction', 'group', 'community', 'team', 'communication', 'people'],
+      scoringBoost: 25
+    },
+    'practical': {
+      preferredTypes: ['workshop', 'conference', 'networking'],
+      preferredFormat: ['hands-on', 'practical', 'skills', 'training', 'implementation'],
+      scoringBoost: 20
+    }
   };
   
-  // Calculate preferred event types based on personality
+  // Calculate preferred event types and formats based on personality
   let preferredTypes: string[] = ['networking', 'conference', 'meetup']; // Default
+  let preferredFormat: string[] = []; // Default empty
+  let personalityBoost = 15; // Default boost
   
-  // Find preferred event types based on personality 
-  for (const [key, types] of Object.entries(personalityPreferences)) {
+  // Find preferred event types and formats based on personality
+  for (const [key, prefs] of Object.entries(personalityPreferences)) {
     if (personality.includes(key)) {
-      preferredTypes = types;
+      preferredTypes = prefs.preferredTypes;
+      preferredFormat = prefs.preferredFormat;
+      personalityBoost = prefs.scoringBoost;
+      console.log(`[Relevance] Matched personality type "${key}" with boost ${personalityBoost}`);
       break;
     }
   }
   
   const scoredEvents = events.map(event => {
-    let score = 40; // Start with a lower base score
+    let score = 35; // Start with a lower base score
+    let interestMatchCount = 0;
+    let keywordMatchCount = 0;
+    let formatMatchCount = 0;
+    let exactMatchBonus = 0;
     let careerRelevance = false;
     
     // Check for career relevance in title and description
     const title = event.title.toLowerCase();
     const description = event.description.toLowerCase();
     
-    // Strongly penalize sports, concerts and entertainment events
+    // Strongly penalize sports, concerts and entertainment events unless they match career interests
     if (
       (title.includes('sports') || 
        title.includes('game') || 
@@ -973,7 +1004,8 @@ function calculateRelevanceScores(
     // Check title for career keyword matches (highest weight)
     for (const keyword of careerKeywords) {
       if (title.includes(keyword)) {
-        score += 15;
+        score += 10;
+        keywordMatchCount++;
         careerRelevance = true;
       }
     }
@@ -981,22 +1013,43 @@ function calculateRelevanceScores(
     // Check description for career keyword matches
     for (const keyword of careerKeywords) {
       if (description.includes(keyword)) {
-        score += 8;
+        score += 5;
+        keywordMatchCount++;
         careerRelevance = true;
       }
     }
     
-    // Check title for interest matches
+    // Check title for exact interest matches (highest priority)
     for (const interest of interests) {
+      // Exact match in title (case insensitive)
       if (title.includes(interest)) {
-        score += 12;
+        score += 15;
+        interestMatchCount++;
+        
+        // Extra boost for exact matches of longer interests (more specific)
+        if (interest.length > 4) {
+          const regex = new RegExp(`\\b${interest}\\b`, 'i');
+          if (regex.test(title)) {
+            exactMatchBonus += 10;
+            console.log(`[Relevance] Exact match for "${interest}" in title: ${event.title}`);
+          }
+        }
       }
     }
     
     // Check description for interest matches
     for (const interest of interests) {
       if (description.includes(interest)) {
-        score += 6;
+        score += 8;
+        interestMatchCount++;
+        
+        // Extra boost for exact matches of longer interests (more specific)
+        if (interest.length > 4) {
+          const regex = new RegExp(`\\b${interest}\\b`, 'i');
+          if (regex.test(description)) {
+            exactMatchBonus += 5;
+          }
+        }
       }
     }
     
@@ -1007,7 +1060,8 @@ function calculateRelevanceScores(
       // Check for career relevance
       for (const keyword of careerKeywords) {
         if (lowercaseCategory.includes(keyword)) {
-          score += 10;
+          score += 8;
+          keywordMatchCount++;
           careerRelevance = true;
         }
       }
@@ -1015,25 +1069,64 @@ function calculateRelevanceScores(
       // Check for interest matches
       for (const interest of interests) {
         if (lowercaseCategory.includes(interest)) {
-          score += 8;
+          score += 10;
+          interestMatchCount++;
         }
+      }
+    }
+    
+    // Check for preferred format matches based on personality
+    for (const format of preferredFormat) {
+      if (title.includes(format) || description.includes(format)) {
+        score += 3;
+        formatMatchCount++;
       }
     }
     
     // Give bonus for preferred event types based on personality
     if (preferredTypes.includes(event.type)) {
-      score += 10;
+      score += personalityBoost;
     }
     
     // Major bonus for events with obvious career relevance
     if (careerRelevance) {
-      score += 20;
+      score += 15;
     } else {
-      score -= 20; // Penalty for non-career events
+      score -= 18; // Penalty for non-career events
+    }
+    
+    // Add bonuses based on match counts
+    if (interestMatchCount > 0) {
+      score += Math.min(interestMatchCount * 3, 15); // Cap at 15 points
+    }
+    
+    if (keywordMatchCount > 0) {
+      score += Math.min(keywordMatchCount * 2, 10); // Cap at 10 points
+    }
+    
+    if (formatMatchCount > 0) {
+      score += Math.min(formatMatchCount * 3, 12); // Cap at 12 points
+    }
+    
+    // Add exact match bonus
+    score += exactMatchBonus;
+    
+    // Normalize score - ensure realistic distribution between 0-100
+    // More events should be in the 50-85 range than 85-100 range
+    if (score > 85) {
+      // Compress scores above 85 to avoid too many 100% matches
+      score = 85 + ((score - 85) * 0.7);
+    } else if (score < 50) {
+      // Expand range below 50 to avoid too many events with very low scores
+      score = score * 0.9;
     }
     
     // Ensure score is within range 0-100
-    score = Math.min(100, Math.max(0, score));
+    score = Math.min(100, Math.max(0, Math.round(score)));
+    
+    if (score >= 90) {
+      console.log(`[Relevance] High score (${score}) for event: ${event.title}`);
+    }
     
     return {
       ...event,
@@ -1042,7 +1135,7 @@ function calculateRelevanceScores(
   });
   
   // Filter out very low scoring events (likely not career-related)
-  return scoredEvents.filter(event => event.relevanceScore >= 40);
+  return scoredEvents.filter(event => event.relevanceScore >= 35);
 }
 
 /**

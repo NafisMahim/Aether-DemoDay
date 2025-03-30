@@ -703,8 +703,13 @@ export default function NetworkingScreen({ handleBack, quizResults }: Networking
                     
                     <CardFooter className="flex items-center justify-between pt-2 pb-4">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium">
-                          {opportunity.relevanceScore}%
+                        <span className={`text-xs font-medium ${
+                          opportunity.relevanceScore >= 90 ? 'text-green-600' : 
+                          opportunity.relevanceScore >= 75 ? 'text-amber-600' : 
+                          opportunity.relevanceScore >= 60 ? 'text-blue-600' : 
+                          'text-gray-600'
+                        }`}>
+                          {opportunity.relevanceScore}% match
                         </span>
                         {opportunity.source && getSourceBadge(opportunity.source)}
                       </div>
